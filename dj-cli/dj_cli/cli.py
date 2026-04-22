@@ -1,0 +1,300 @@
+"""DJ CLI — playlist preparation pipeline."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from dj_cli.models import EventPlan
+
+app = typer.Typer(help="DJ playlist preparation CLI")
+console = Console()
+
+DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+
+
+@app.command()
+def fetch(
+    playlist_url: str = typer.Argument(help="Spotify playlist URL or ID"),
+    output: Path = typer.Option(None, "--output", "-o", help="Output JSON path (default: data/<playlist-name>.json)"),
+) -> None:
+    """Fetch all tracks from a Spotify playlist, enrich with artist genres, save to JSON."""
+    from dj_cli.spotify_client import (
+        extract_playlist_id,
+        fetch_artist_genres,
+        fetch_playlist_tracks,
+        get_spotify_client,
+    )
+
+    console.print("[bold]Connecting to Spotify...[/bold]")
+    sp = get_spotify_client()
+
+    playlist_id = extract_playlist_id(playlist_url)
+    console.print(f"Fetching playlist [cyan]{playlist_id}[/cyan]...")
+
+    playlist_name, tracks = fetch_playlist_tracks(sp, playlist_id)
+    console.print(f"Found [green]{len(tracks)}[/green] tracks in '{playlist_name}'")
+
+    # Collect unique artist IDs
+    all_artist_ids = list({aid for t in tracks for aid in t.artist_ids})
+    console.print(f"Fetching genres for [cyan]{len(all_artist_ids)}[/cyan] unique artists...")
+    artist_genres = fetch_artist_genres(sp, all_artist_ids)
+
+    # Enrich tracks with genres
+    for track in tracks:
+        genres: list[str] = []
+        for aid in track.artist_ids:
+            genres.extend(artist_genres.get(aid, []))
+        track.artist_genres = list(set(genres))
+
+    # Save
+    plan = EventPlan(
+        source_playlist_id=playlist_id,
+        source_playlist_name=playlist_name,
+        tracks=tracks,
+    )
+
+    if output is None:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        safe_name = playlist_name.lower().replace(" ", "-").replace("/", "-")[:50]
+        output = DATA_DIR / f"{safe_name}.json"
+
+    plan.save(output)
+    console.print(f"Saved to [green]{output}[/green]")
+
+
+@app.command()
+def classify(
+    input_file: Path = typer.Argument(help="Path to fetched playlist JSON"),
+    min_bucket_size: int = typer.Option(3, "--min-bucket", help="Minimum tracks per bucket (smaller buckets get merged)"),
+) -> None:
+    """Classify tracks into genre buckets and print a summary."""
+    from dj_cli.classifier import classify_tracks, consolidate_small_buckets
+
+    plan = EventPlan.load(input_file)
+    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks from '{plan.source_playlist_name}'")
+
+    classify_tracks(plan.tracks)
+    consolidate_small_buckets(plan.tracks, min_size=min_bucket_size)
+
+    # Print summary table
+    buckets = plan.bucket_summary()
+    table = Table(title=f"Genre Classification — {plan.source_playlist_name} ({len(plan.tracks)} tracks)")
+    table.add_column("Bucket", style="cyan")
+    table.add_column("Tracks", justify="right", style="green")
+    table.add_column("High", justify="right")
+    table.add_column("Medium", justify="right")
+    table.add_column("Low", justify="right")
+
+    for bucket_name, bucket_tracks in buckets.items():
+        high = sum(1 for t in bucket_tracks if t.confidence == "high")
+        med = sum(1 for t in bucket_tracks if t.confidence == "medium")
+        low = sum(1 for t in bucket_tracks if t.confidence == "low")
+        table.add_row(bucket_name, str(len(bucket_tracks)), str(high), str(med), str(low))
+
+    console.print(table)
+
+    # Save classified version
+    output = input_file.with_suffix(".classified.json")
+    plan.save(output)
+    console.print(f"Saved classified plan to [green]{output}[/green]")
+
+
+@app.command()
+def review(
+    input_file: Path = typer.Argument(help="Path to classified JSON"),
+) -> None:
+    """Print tracks with low-confidence classification for manual review."""
+    plan = EventPlan.load(input_file)
+
+    low_conf = [t for t in plan.tracks if t.confidence == "low"]
+    med_conf = [t for t in plan.tracks if t.confidence == "medium"]
+
+    if not low_conf and not med_conf:
+        console.print("[green]All tracks classified with high confidence![/green]")
+        return
+
+    if med_conf:
+        table = Table(title=f"Medium Confidence ({len(med_conf)} tracks)")
+        table.add_column("#", justify="right", style="dim")
+        table.add_column("Track")
+        table.add_column("Bucket", style="cyan")
+        table.add_column("Year", justify="right")
+        table.add_column("Genres", style="dim")
+
+        for i, t in enumerate(med_conf, 1):
+            table.add_row(str(i), t.display_name(), t.bucket or "?", str(t.release_year or "?"), ", ".join(t.artist_genres[:3]) or "none")
+
+        console.print(table)
+
+    if low_conf:
+        table = Table(title=f"Low Confidence / Fallback ({len(low_conf)} tracks)")
+        table.add_column("#", justify="right", style="dim")
+        table.add_column("Track")
+        table.add_column("Bucket", style="yellow")
+        table.add_column("Year", justify="right")
+        table.add_column("Genres", style="dim")
+
+        for i, t in enumerate(low_conf, 1):
+            table.add_row(str(i), t.display_name(), t.bucket or "?", str(t.release_year or "?"), ", ".join(t.artist_genres[:3]) or "none")
+
+        console.print(table)
+
+    console.print(f"\nEdit the classified JSON directly to move tracks between buckets.")
+    console.print(f"Or use the LLM skill for AI-assisted review.")
+
+
+@app.command(name="create-playlists")
+def create_playlists(
+    input_file: Path = typer.Argument(help="Path to classified JSON"),
+    event: str = typer.Option(..., "--event", "-e", help="Event name (e.g., 'Wedding Tim & Lea')"),
+    date: str = typer.Option(..., "--date", "-d", help="Event date (e.g., '2026-04-22')"),
+) -> None:
+    """Create Spotify sub-playlists from classified tracks."""
+    from dj_cli.spotify_client import (
+        add_tracks_to_playlist,
+        create_playlist,
+        get_spotify_client,
+    )
+
+    plan = EventPlan.load(input_file)
+    plan.event_name = event
+    plan.event_date = date
+
+    sp = get_spotify_client()
+    buckets = plan.bucket_summary()
+
+    console.print(f"Creating [cyan]{len(buckets)}[/cyan] playlists for '{event}'...")
+
+    for bucket_name, bucket_tracks in buckets.items():
+        if bucket_name == "Unclassified":
+            continue
+
+        playlist_name = f"{event} — {bucket_name}"
+        description = f"{event} — {date} — {bucket_name} — Auto-sorted from wish playlist"
+
+        playlist_id = create_playlist(sp, playlist_name, description)
+        track_ids = [t.id for t in bucket_tracks]
+        add_tracks_to_playlist(sp, playlist_id, track_ids)
+
+        plan.created_playlists[bucket_name] = playlist_id
+        console.print(f"  ✓ {playlist_name} — {len(track_ids)} tracks")
+
+    plan.save(input_file)
+    console.print(f"\n[green]Done![/green] Created {len(plan.created_playlists)} playlists.")
+
+
+@app.command(name="build-masters")
+def build_masters(
+    input_file: Path = typer.Argument(help="Path to classified JSON"),
+) -> None:
+    """Add classified tracks to cross-event [DJ] master playlists on Spotify."""
+    from dj_cli.spotify_client import (
+        add_tracks_to_playlist,
+        create_playlist,
+        get_playlist_track_ids,
+        get_spotify_client,
+        get_user_playlists,
+    )
+
+    plan = EventPlan.load(input_file)
+    sp = get_spotify_client()
+    buckets = plan.bucket_summary()
+
+    # Find existing [DJ] playlists
+    user_playlists = get_user_playlists(sp)
+    dj_playlists = {p["name"]: p["id"] for p in user_playlists if p["name"].startswith("[DJ] ")}
+
+    console.print(f"Found [cyan]{len(dj_playlists)}[/cyan] existing [DJ] master playlists")
+
+    total_added = 0
+    total_dupes = 0
+
+    for bucket_name, bucket_tracks in buckets.items():
+        if bucket_name == "Unclassified":
+            continue
+
+        master_name = f"[DJ] {bucket_name}"
+        track_ids = [t.id for t in bucket_tracks]
+
+        if master_name in dj_playlists:
+            playlist_id = dj_playlists[master_name]
+            existing_ids = get_playlist_track_ids(sp, playlist_id)
+            new_ids = [tid for tid in track_ids if tid not in existing_ids]
+            dupes = len(track_ids) - len(new_ids)
+        else:
+            playlist_id = create_playlist(sp, master_name, f"Cross-event master playlist — {bucket_name}")
+            dj_playlists[master_name] = playlist_id
+            new_ids = track_ids
+            dupes = 0
+
+        if new_ids:
+            add_tracks_to_playlist(sp, playlist_id, new_ids)
+
+        total_added += len(new_ids)
+        total_dupes += dupes
+
+        status = f"+{len(new_ids)} new"
+        if dupes:
+            status += f", {dupes} dupes skipped"
+        console.print(f"  {master_name} — {status}")
+
+    console.print(f"\n[green]Done![/green] Added {total_added} tracks, skipped {total_dupes} duplicates.")
+
+
+@app.command(name="sync-to-tidal")
+def sync_to_tidal(
+    input_file: Path = typer.Argument(help="Path to classified JSON"),
+) -> None:
+    """Sync classified playlists to Tidal via ISRC matching."""
+    from dj_cli.tidal_client import (
+        add_tracks_by_isrc,
+        create_playlist,
+        get_tidal_session,
+    )
+
+    plan = EventPlan.load(input_file)
+    session = get_tidal_session()
+    buckets = plan.bucket_summary()
+
+    event_prefix = plan.event_name or plan.source_playlist_name
+
+    console.print(f"Syncing [cyan]{len(buckets)}[/cyan] playlists to Tidal...")
+
+    total_added = 0
+    total_failed = 0
+
+    for bucket_name, bucket_tracks in buckets.items():
+        if bucket_name == "Unclassified":
+            continue
+
+        isrcs = [t.isrc for t in bucket_tracks if t.isrc]
+        if not isrcs:
+            console.print(f"  ✗ {bucket_name} — no ISRCs available, skipping")
+            continue
+
+        playlist_name = f"{event_prefix} — {bucket_name}"
+        tidal_playlist_id = create_playlist(session, playlist_name)
+        added, failed = add_tracks_by_isrc(session, tidal_playlist_id, isrcs)
+
+        plan.tidal_playlists[bucket_name] = tidal_playlist_id
+        total_added += len(added)
+        total_failed += len(failed)
+
+        status = f"✓ {len(added)}/{len(isrcs)} matched"
+        if failed:
+            status += f", {len(failed)} failed"
+        console.print(f"  {playlist_name} — {status}")
+
+    plan.save(input_file)
+
+    console.print(f"\n[green]Done![/green] Synced {total_added} tracks to Tidal, {total_failed} failed.")
+    if total_failed:
+        console.print("[yellow]Run 'dj review' to see which tracks failed.[/yellow]")
+
+
+if __name__ == "__main__":
+    app()

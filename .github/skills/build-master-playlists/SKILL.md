@@ -15,65 +15,46 @@ Add tracks from a source playlist into cross-event **[DJ] master playlists** —
 - When building up master playlists from multiple events
 - After running `sort-playlist-by-genre` and wanting to also populate the masters
 
-## Required MCP Servers
+## Required
 
-- **spotify** — must be connected and authenticated
+- **dj-cli** installed (`cd dj-cli && source .venv/bin/activate`)
+- **spotify** MCP server — must be connected and authenticated
 
 ## Input
 
 The user provides:
-- **Spotify playlist(s)** — one or more playlist URLs/IDs to process (can be a raw wish list or already-sorted sub-playlists)
+- **Classified JSON** — path to a `.classified.json` file from a prior `dj classify` run
+- OR **Spotify playlist(s)** — one or more playlist URLs/IDs (will be fetched and classified first)
 
 ## Procedure
 
-### Step 1: Read Source Tracks
+### Step 1: Ensure Classified Data Exists
 
-1. Use `getPlaylistTracks` to fetch all tracks from the source playlist(s). Paginate if needed.
-2. Report total track count.
+If the user provides a classified JSON, use it directly.
 
-### Step 2: Analyze & Classify
+If the user provides a Spotify playlist URL/ID instead:
 
-1. Collect unique artist IDs, fetch genres via `getArtistsGenres` (batches of 50).
-2. Fetch audio features via `getTracksAudioFeatures` (batches of 100).
-3. Classify each track into a genre bucket using [genre-buckets.md](./references/genre-buckets.md).
-
-### Step 3: Find or Create Master Playlists
-
-1. Use `getMyPlaylists` to list all existing playlists.
-2. For each genre bucket that has tracks, look for an existing playlist named **`[DJ] {Bucket Name}`**.
-3. If it doesn't exist, use `createPlaylist` to create it:
-   - **Name**: `[DJ] {Bucket Name}` (e.g., `[DJ] Party Hits`)
-   - **Description**: `Cross-event master playlist — {Bucket Name}`
-
-### Step 4: Check for Duplicates
-
-For each master playlist that will receive tracks:
-
-1. Use `getPlaylistTracks` to fetch the existing tracks in the master playlist.
-2. Compare track IDs with the tracks to be added.
-3. Separate into **new tracks** (to add) and **duplicates** (to skip).
-
-### Step 5: Add Tracks
-
-1. Use `addTracksToPlaylist` to add only the new (non-duplicate) tracks to each master playlist.
-
-### Step 6: Report Results
-
-Present a summary:
-
+```bash
+cd dj-cli && source .venv/bin/activate
+dj fetch <playlist-url-or-id>
+dj classify data/<playlist-name>.json
 ```
-Master Playlist Updates:
-  [DJ] Party Hits     — +12 new tracks (3 duplicates skipped), total: 87
-  [DJ] 90s            — +8 new tracks (1 duplicate skipped), total: 45
-  [DJ] Schlager       — +5 new tracks, total: 32
-  [DJ] House / Dance  — +4 new tracks, total: 28
-  [DJ] Hip-Hop / R&B  — created new, 6 tracks
-  
-Skipped duplicates (already in master):
-  - "Macarena" by Los del Rio → [DJ] Party Hits
-  - "Everybody" by Backstreet Boys → [DJ] 90s
-  ...
+
+### Step 2: Add to Master Playlists
+
+```bash
+dj build-masters data/<playlist-name>.classified.json
 ```
+
+This will:
+- Find existing `[DJ] {Bucket Name}` playlists in the user's Spotify library
+- Create new `[DJ]` playlists for any missing buckets
+- Deduplicate tracks (skip tracks already in the master playlist)
+- Add only new tracks
+
+### Step 3: Report Results
+
+Show the summary output from the command — how many new tracks were added, how many duplicates were skipped per master playlist.
 
 ## Quality Checks
 
