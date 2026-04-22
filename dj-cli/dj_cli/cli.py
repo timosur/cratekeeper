@@ -70,12 +70,27 @@ def fetch(
 def classify(
     input_file: Path = typer.Argument(help="Path to fetched playlist JSON"),
     min_bucket_size: int = typer.Option(3, "--min-bucket", help="Minimum tracks per bucket (smaller buckets get merged)"),
+    enrich: bool = typer.Option(False, "--enrich", "-e", help="Enrich missing genres via MusicBrainz before classifying"),
 ) -> None:
     """Classify tracks into genre buckets and print a summary."""
     from dj_cli.classifier import classify_tracks, consolidate_small_buckets
 
     plan = EventPlan.load(input_file)
     console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks from '{plan.source_playlist_name}'")
+
+    if enrich:
+        from dj_cli.musicbrainz_client import enrich_tracks_genres
+
+        missing = sum(1 for t in plan.tracks if not t.artist_genres and t.isrc)
+        if missing:
+            console.print(f"Enriching [cyan]{missing}[/cyan] tracks via MusicBrainz (≈{missing}s)...")
+            def _progress(i, total, track, genres):
+                tag = f" → {', '.join(genres[:3])}" if genres else " → no tags"
+                console.print(f"  [{i}/{total}] {track.display_name()}{tag}")
+            enriched = enrich_tracks_genres(plan.tracks, progress_callback=_progress)
+            console.print(f"Enriched [green]{enriched}[/green] of {missing} tracks with MusicBrainz tags")
+        else:
+            console.print("[dim]No tracks need enrichment[/dim]")
 
     classify_tracks(plan.tracks)
     consolidate_small_buckets(plan.tracks, min_size=min_bucket_size)
@@ -101,6 +116,34 @@ def classify(
     output = input_file.with_suffix(".classified.json")
     plan.save(output)
     console.print(f"Saved classified plan to [green]{output}[/green]")
+
+
+@app.command()
+def enrich(
+    input_file: Path = typer.Argument(help="Path to fetched/classified playlist JSON"),
+) -> None:
+    """Enrich tracks missing genre data via MusicBrainz ISRC lookup."""
+    from dj_cli.musicbrainz_client import enrich_tracks_genres
+
+    plan = EventPlan.load(input_file)
+    missing = sum(1 for t in plan.tracks if not t.artist_genres and t.isrc)
+    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks, [cyan]{missing}[/cyan] missing genres")
+
+    if not missing:
+        console.print("[green]All tracks already have genre data![/green]")
+        return
+
+    console.print(f"Querying MusicBrainz for {missing} tracks (≈{missing}s due to rate limit)...")
+
+    def _progress(i, total, track, genres):
+        tag = f" → {', '.join(genres[:3])}" if genres else " → no tags"
+        console.print(f"  [{i}/{total}] {track.display_name()}{tag}")
+
+    enriched = enrich_tracks_genres(plan.tracks, progress_callback=_progress)
+    console.print(f"\nEnriched [green]{enriched}[/green] of {missing} tracks")
+
+    plan.save(input_file)
+    console.print(f"Saved to [green]{input_file}[/green]")
 
 
 @app.command()
