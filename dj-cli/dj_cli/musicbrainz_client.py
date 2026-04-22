@@ -41,8 +41,11 @@ def _rate_limited_get(url: str, params: dict | None = None) -> dict | None:
     return resp.json()
 
 
-def fetch_genres_by_isrc(isrc: str) -> list[str]:
-    """Look up a recording by ISRC and return its genre/tag list."""
+def fetch_genres_by_isrc(isrc: str, min_votes: int = 2) -> list[str]:
+    """Look up a recording by ISRC and return its genre/tag list.
+
+    Only returns tags with at least min_votes to filter out community noise.
+    """
     url = f"{_BASE_URL}/recording"
     params = {"query": f"isrc:{isrc}", "fmt": "json", "limit": "1"}
 
@@ -52,9 +55,9 @@ def fetch_genres_by_isrc(isrc: str) -> list[str]:
 
     recording = data["recordings"][0]
     tags = recording.get("tags", [])
-    # Return tags sorted by vote count (most popular first)
+    # Filter by vote count and sort by popularity
     sorted_tags = sorted(tags, key=lambda t: t.get("count", 0), reverse=True)
-    return [t["name"].lower() for t in sorted_tags if t.get("name")]
+    return [t["name"].lower() for t in sorted_tags if t.get("name") and t.get("count", 0) >= min_votes]
 
 
 def enrich_tracks_genres(tracks: list, progress_callback=None) -> int:

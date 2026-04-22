@@ -2,8 +2,25 @@
 
 from __future__ import annotations
 
+import re
+
 from dj_cli.genre_buckets import FALLBACK_BUCKET, GenreBucket, get_buckets
 from dj_cli.models import Track
+
+
+def _word_match(tag: str, genre: str) -> bool:
+    """Check if the bucket tag matches the track genre.
+
+    The tag must appear as a whole word/phrase within the genre string.
+    We do NOT match in reverse (a short genre like "dance" should not match
+    a compound tag like "indie dance").
+    """
+    if tag == genre:
+        return True
+    # tag appears as a whole word in the genre
+    if re.search(rf'\b{re.escape(tag)}\b', genre):
+        return True
+    return False
 
 
 def classify_track(track: Track, buckets: list[GenreBucket] | None = None) -> tuple[str, str]:
@@ -21,7 +38,7 @@ def classify_track(track: Track, buckets: list[GenreBucket] | None = None) -> tu
     for bucket in buckets:
         for tag in bucket.genre_tags:
             for genre in genres_lower:
-                if tag in genre or genre in tag:
+                if _word_match(tag, genre):
                     return bucket.name, "high"
 
     # Pass 2: Match by release year (for era buckets)
