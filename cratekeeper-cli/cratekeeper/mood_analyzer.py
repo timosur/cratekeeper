@@ -19,6 +19,14 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+# Suppress TF networking/logging noise before anything imports TF
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")          # hide INFO/WARNING
+os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")         # no oneDNN warnings
+os.environ.setdefault("GRPC_VERBOSITY", "ERROR")             # silence gRPC
+os.environ.setdefault("GRPC_DNS_RESOLVER", "native")         # avoid c-ares DNS warnings
+os.environ.setdefault("NO_GCE_CHECK", "true")                # skip GCE metadata probe
+os.environ.setdefault("GCS_READ_CACHE_DISABLED", "true")     # no GCS network calls
+os.environ.setdefault("ABSL_MIN_LOG_LEVEL", "2")             # silence absl INFO/WARNING
 
 # Directory for downloaded TF models
 MODELS_DIR = Path(os.environ.get("ESSENTIA_MODELS_DIR", "/app/models"))
@@ -31,19 +39,19 @@ _MODEL_FILES = {
     # Embedding extractor
     "discogs-effnet": "feature-extractors/discogs-effnet/discogs-effnet-bs64-1.pb",
     # Mood classifiers (binary, based on discogs-effnet embeddings)
-    "mood_happy": "classifiers/mood_happy/mood_happy-discogs-effnet-1.pb",
-    "mood_party": "classifiers/mood_party/mood_party-discogs-effnet-1.pb",
-    "mood_relaxed": "classifiers/mood_relaxed/mood_relaxed-discogs-effnet-1.pb",
-    "mood_sad": "classifiers/mood_sad/mood_sad-discogs-effnet-1.pb",
-    "mood_aggressive": "classifiers/mood_aggressive/mood_aggressive-discogs-effnet-1.pb",
+    "mood_happy": "classification-heads/mood_happy/mood_happy-discogs-effnet-1.pb",
+    "mood_party": "classification-heads/mood_party/mood_party-discogs-effnet-1.pb",
+    "mood_relaxed": "classification-heads/mood_relaxed/mood_relaxed-discogs-effnet-1.pb",
+    "mood_sad": "classification-heads/mood_sad/mood_sad-discogs-effnet-1.pb",
+    "mood_aggressive": "classification-heads/mood_aggressive/mood_aggressive-discogs-effnet-1.pb",
     # Voice/instrumental
-    "voice_instrumental": "classifiers/voice_instrumental/voice_instrumental-discogs-effnet-1.pb",
+    "voice_instrumental": "classification-heads/voice_instrumental/voice_instrumental-discogs-effnet-1.pb",
     # Danceability (TF-based, more accurate than built-in)
-    "danceability": "classifiers/danceability/danceability-discogs-effnet-1.pb",
+    "danceability": "classification-heads/danceability/danceability-discogs-effnet-1.pb",
     # MusiCNN embedding extractor (for arousal/valence)
     "msd-musicnn": "feature-extractors/musicnn/msd-musicnn-1.pb",
     # Arousal/valence regression (DEAM dataset)
-    "deam": "classifiers/deam/deam-msd-musicnn-1.pb",
+    "deam": "classification-heads/deam/deam-msd-musicnn-1.pb",
 }
 
 
@@ -161,26 +169,25 @@ def _extract_tf_features(file_path: str, features: AudioFeatures, es) -> None:
     Requires essentia-tensorflow to be installed.
     Mutates the features dataclass in place.
     """
+    import essentia
     import numpy as np
+
+    # Suppress essentia streaming network warnings and TF graph-load info
+    essentia.log.warningActive = False
+    essentia.log.infoActive = False
+
+    predictors = _get_tf_predictors(es)
 
     # Load audio at 16kHz for TF models
     audio_16k = es.MonoLoader(filename=file_path, sampleRate=16000)()
 
     # --- Discogs-EffNet embeddings (shared across multiple classifiers) ---
-    effnet_model = _ensure_model("discogs-effnet")
-    embeddings = es.TensorflowPredictEffnetDiscogs(
-        graphFilename=str(effnet_model),
-        output="PartitionedCall:1",
-    )(audio_16k)
+    embeddings = predictors["effnet"](audio_16k)
 
     # Mood classifiers (binary, probability of positive class)
     for mood_name in ["mood_happy", "mood_party", "mood_relaxed", "mood_sad", "mood_aggressive"]:
         try:
-            model_path = _ensure_model(mood_name)
-            preds = es.TensorflowPredict2D(
-                graphFilename=str(model_path),
-                output="model/Softmax",
-            )(embeddings)
+            preds = predictors[mood_name](embeddings)
             # Average across time, take positive class probability (index 0)
             prob = float(np.mean(preds[:, 0]))
             setattr(features, mood_name, round(prob, 3))
@@ -189,11 +196,7 @@ def _extract_tf_features(file_path: str, features: AudioFeatures, es) -> None:
 
     # Voice/instrumental
     try:
-        vi_model = _ensure_model("voice_instrumental")
-        vi_preds = es.TensorflowPredict2D(
-            graphFilename=str(vi_model),
-            output="model/Softmax",
-        )(embeddings)
+        vi_preds = predictors["voice_instrumental"](embeddings)
         vi_avg = np.mean(vi_preds, axis=0)
         features.voice_instrumental = "voice" if vi_avg[0] > vi_avg[1] else "instrumental"
     except Exception:
@@ -201,33 +204,89 @@ def _extract_tf_features(file_path: str, features: AudioFeatures, es) -> None:
 
     # ML-based danceability
     try:
-        dance_model = _ensure_model("danceability")
-        dance_preds = es.TensorflowPredict2D(
-            graphFilename=str(dance_model),
-            output="model/Softmax",
-        )(embeddings)
+        dance_preds = predictors["danceability"](embeddings)
         features.danceability_ml = round(float(np.mean(dance_preds[:, 0])), 3)
     except Exception:
         pass
 
     # --- Arousal/Valence (using MusiCNN embeddings + DEAM model) ---
     try:
-        musicnn_model = _ensure_model("msd-musicnn")
-        musicnn_embeddings = es.TensorflowPredictMusiCNN(
-            graphFilename=str(musicnn_model),
-            output="model/dense/BiasAdd",
-        )(audio_16k)
-
-        deam_model = _ensure_model("deam")
-        av_preds = es.TensorflowPredict2D(
-            graphFilename=str(deam_model),
-            output="model/Identity",
-        )(musicnn_embeddings)
+        musicnn_embeddings = predictors["musicnn"](audio_16k)
+        av_preds = predictors["deam"](musicnn_embeddings)
         av_avg = np.mean(av_preds, axis=0)
         features.valence = round(float(av_avg[0]), 2)
         features.arousal = round(float(av_avg[1]), 2)
     except Exception:
         pass
+
+
+# Cached predictor instances — loaded once, reused across tracks
+_tf_predictors: dict | None = None
+
+
+def _get_tf_predictors(es) -> dict:
+    """Load and cache all TF predictor instances."""
+    import contextlib
+    import io
+    import sys
+
+    global _tf_predictors
+    if _tf_predictors is not None:
+        return _tf_predictors
+
+    _tf_predictors = {}
+
+    # Suppress TF C++ absl/MLIR warnings emitted to stderr on first graph load
+    _real_stderr = sys.stderr
+    sys.stderr = io.StringIO()
+    try:
+        # Embedding extractor
+        effnet_model = _ensure_model("discogs-effnet")
+        _tf_predictors["effnet"] = es.TensorflowPredictEffnetDiscogs(
+            graphFilename=str(effnet_model),
+            output="PartitionedCall:1",
+        )
+    finally:
+        sys.stderr = _real_stderr
+
+    # Mood classifiers
+    for mood_name in ["mood_happy", "mood_party", "mood_relaxed", "mood_sad", "mood_aggressive"]:
+        model_path = _ensure_model(mood_name)
+        _tf_predictors[mood_name] = es.TensorflowPredict2D(
+            graphFilename=str(model_path),
+            output="model/Softmax",
+        )
+
+    # Voice/instrumental
+    vi_model = _ensure_model("voice_instrumental")
+    _tf_predictors["voice_instrumental"] = es.TensorflowPredict2D(
+        graphFilename=str(vi_model),
+        output="model/Softmax",
+    )
+
+    # Danceability
+    dance_model = _ensure_model("danceability")
+    _tf_predictors["danceability"] = es.TensorflowPredict2D(
+        graphFilename=str(dance_model),
+        output="model/Softmax",
+    )
+
+    # MusiCNN embedding extractor
+    musicnn_model = _ensure_model("msd-musicnn")
+    _tf_predictors["musicnn"] = es.TensorflowPredictMusiCNN(
+        graphFilename=str(musicnn_model),
+        output="model/dense/BiasAdd",
+    )
+
+    # DEAM arousal/valence
+    deam_model = _ensure_model("deam")
+    _tf_predictors["deam"] = es.TensorflowPredict2D(
+        graphFilename=str(deam_model),
+        input="flatten_in_input",
+        output="dense_out",
+    )
+
+    return _tf_predictors
 
 
 def analyze_track(file_path: str | Path, genre: str | None = None, use_tf: bool = True) -> AudioFeatures:
