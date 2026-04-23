@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
-from typing import Any
 import json
 from pathlib import Path
 
@@ -24,8 +23,23 @@ class Track:
     bucket: str | None = None
     confidence: str = "high"  # high, medium, low
     local_path: str | None = None
-    mood: str | None = None
+    mood: str | None = None  # legacy: old mood system (Chill/Groovy/Peak etc.)
     era: str | None = None
+
+    # --- New tag fields ---
+    energy: str | None = None  # low / mid / high
+    function: list[str] = field(default_factory=list)  # floorfiller, singalong, bridge, reset, closer, opener
+    crowd: list[str] = field(default_factory=list)  # mixed-age, older, younger, family
+    mood_tags: list[str] = field(default_factory=list)  # feelgood, emotional, euphoric, nostalgic
+
+    # --- Audio analysis fields (from essentia) ---
+    bpm: float | None = None
+    key: str | None = None  # e.g. "C major", "A minor"
+    danceability: float | None = None  # 0-1
+    audio_energy: float | None = None  # raw 0-1 energy from essentia
+    audio_mood: dict[str, float] = field(default_factory=dict)  # {happy: 0.8, party: 0.9, ...}
+    arousal: float | None = None  # 1-9
+    valence: float | None = None  # 1-9
 
     def display_name(self) -> str:
         return f'"{self.name}" by {", ".join(self.artists)}'

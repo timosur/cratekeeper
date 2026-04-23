@@ -15,14 +15,14 @@ services:
       timeout: 3s
       retries: 10
 
-  dj:
-    build: ./dj-cli
+  crate:
+    build: ./cratekeeper-cli
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - ./data:/data
-      - ./dj-cli/dj_cli:/app/dj_cli
+      - ./cratekeeper-cli/cratekeeper:/app/cratekeeper
       - ./spotify-mcp/spotify-config.json:/app/../spotify-mcp/spotify-config.json
       - /Volumes/home/Music:/music:ro
       - ~/Music/Library:/library

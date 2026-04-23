@@ -110,3 +110,12 @@ def classify_mood(bpm: float, energy: float, danceability: float, genre: str | N
     elif energy >= 0.25:
         return "Warm-Up"
     return "Chill"
+
+
+def classify_energy(energy_value: float) -> str:
+    """Map raw 0-1 energy to low/mid/high."""
+    if energy_value < 0.33:
+        return "low"
+    elif energy_value < 0.66:
+        return "mid"
+    return "high"

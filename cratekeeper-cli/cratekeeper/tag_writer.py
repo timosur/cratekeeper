@@ -1,33 +1,49 @@
-"""Write genre, mood, and era metadata into audio file ID3/FLAC tags."""
+"""Write genre, BPM, key, and structured tags into audio file ID3/FLAC tags.
+
+Tag mapping:
+- Genre (TCON / genre): bucket name
+- BPM (TBPM / bpm): beats per minute
+- Key (TKEY / initialkey): musical key
+- Comment (COMM / comment): structured tags string
+  Format: era:90s; energy:high; function:floorfiller,singalong; crowd:mixed-age; mood:feelgood,euphoric
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import mutagen
-from mutagen.easyid3 import EasyID3
 from mutagen.flac import FLAC
-from mutagen.id3 import ID3, TCON, COMM, TIT1, GRP1
-from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, TCON, COMM, TBPM, TKEY
 
-from dj_cli.models import Track
+from cratekeeper.models import Track
 
 
-def _compute_era(year: int | None) -> str | None:
-    """Derive era label from release year."""
-    if not year:
-        return None
-    decade = (year // 10) * 10
-    if decade <= 1970:
-        return "Oldschool"
-    return f"{decade}s"
+def _build_comment(track: Track) -> str:
+    """Build the structured tags comment string."""
+    parts = []
+
+    era = track.era or track.compute_era()
+    if era:
+        parts.append(f"era:{era}")
+
+    if track.energy:
+        parts.append(f"energy:{track.energy}")
+
+    if track.function:
+        parts.append(f"function:{','.join(track.function)}")
+
+    if track.crowd:
+        parts.append(f"crowd:{','.join(track.crowd)}")
+
+    if track.mood_tags:
+        parts.append(f"mood:{','.join(track.mood_tags)}")
+
+    return "; ".join(parts)
 
 
 def tag_track(track: Track) -> bool:
     """Write classification metadata into a track's audio file tags.
-
-    Sets: Genre (bucket), Grouping (mood), Content Group (era),
-    Comment (classification source).
 
     Returns True if tags were written successfully.
     """
@@ -46,7 +62,6 @@ def tag_track(track: Track) -> bool:
         elif suffix == ".flac":
             return _tag_flac(path, track)
         else:
-            # For other formats, try generic mutagen
             return _tag_generic(path, track)
     except Exception:
         return False
@@ -64,19 +79,21 @@ def _tag_mp3(path: Path, track: Track) -> bool:
         tags.delall("TCON")
         tags.add(TCON(encoding=3, text=[track.bucket]))
 
-    # Grouping / Mood (GRP1 = iTunes grouping, TIT1 = content group)
-    if track.mood:
-        tags.delall("GRP1")
-        tags.add(GRP1(encoding=3, text=[track.mood]))
-        tags.delall("TIT1")
-        tags.add(TIT1(encoding=3, text=[track.mood]))
+    # BPM (TBPM)
+    if track.bpm:
+        tags.delall("TBPM")
+        tags.add(TBPM(encoding=3, text=[str(int(round(track.bpm)))]))
 
-    # Era in comment
-    era = _compute_era(track.release_year)
-    if era:
-        track.era = era
+    # Key (TKEY)
+    if track.key:
+        tags.delall("TKEY")
+        tags.add(TKEY(encoding=3, text=[track.key]))
+
+    # Structured tags comment
+    comment = _build_comment(track)
+    if comment:
         tags.delall("COMM")
-        tags.add(COMM(encoding=3, lang="eng", desc="era", text=[era]))
+        tags.add(COMM(encoding=3, lang="eng", desc="dj-tags", text=[comment]))
 
     tags.save(str(path))
     return True
@@ -88,15 +105,16 @@ def _tag_flac(path: Path, track: Track) -> bool:
 
     if track.bucket:
         audio["genre"] = track.bucket
-    if track.mood:
-        audio["grouping"] = track.mood
-        audio["mood"] = track.mood
 
-    era = _compute_era(track.release_year)
-    if era:
-        track.era = era
-        audio["era"] = era
-        audio["comment"] = f"Era: {era}"
+    if track.bpm:
+        audio["bpm"] = str(int(round(track.bpm)))
+
+    if track.key:
+        audio["initialkey"] = track.key
+
+    comment = _build_comment(track)
+    if comment:
+        audio["comment"] = comment
 
     audio.save()
     return True
@@ -110,10 +128,6 @@ def _tag_generic(path: Path, track: Track) -> bool:
 
     if track.bucket:
         audio["genre"] = track.bucket
-
-    era = _compute_era(track.release_year)
-    if era:
-        track.era = era
 
     audio.save()
     return True

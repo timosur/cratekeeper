@@ -5,12 +5,11 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from dj_cli.models import Track
+from cratekeeper.models import Track
 
 
 def _safe_filename(name: str) -> str:
     """Sanitize a string for use as a filename."""
-    # Replace problematic characters
     for ch in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']:
         name = name.replace(ch, '-')
     return name.strip('. ')
@@ -28,7 +27,7 @@ def build_event_folder(
     output_dir: Path,
     progress_callback=None,
 ) -> tuple[int, int, list[Track]]:
-    """Create an event folder with Genre/Mood/ structure by copying files.
+    """Create an event folder with Genre/ structure by copying files.
 
     Returns (created_count, skipped_count, missing_tracks).
     """
@@ -47,12 +46,11 @@ def build_event_folder(
             missing.append(track)
             continue
 
-        # Build target path: output_dir / Genre / Mood / Artist - Title.ext
+        # Build target path: output_dir / Genre / Artist - Title.ext
         genre = _safe_filename(track.bucket or "Unsorted")
-        mood = _safe_filename(track.mood or "Unclassified")
         filename = _track_filename(track) + source.suffix
 
-        target_dir = output_dir / genre / mood
+        target_dir = output_dir / genre
         target_dir.mkdir(parents=True, exist_ok=True)
         target_path = target_dir / filename
 

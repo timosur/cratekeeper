@@ -9,7 +9,7 @@ import requests
 
 _BASE_URL = "https://musicbrainz.org/ws/2"
 _HEADERS = {
-    "User-Agent": "dj-cli/1.0.0 (https://github.com/timosur/dj-playlist-prepare)",
+    "User-Agent": "cratekeeper/1.0.0 (https://github.com/timosur/cratekeeper)",
     "Accept": "application/json",
 }
 

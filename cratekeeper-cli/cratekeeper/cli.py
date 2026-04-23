@@ -1,4 +1,4 @@
-"""DJ CLI — playlist preparation pipeline."""
+"""Cratekeeper — DJ library management CLI."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from dj_cli.models import EventPlan
+from cratekeeper.models import EventPlan
 
-app = typer.Typer(help="DJ playlist preparation CLI")
+app = typer.Typer(help="Cratekeeper — DJ library management CLI")
 console = Console()
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
@@ -22,7 +22,7 @@ def fetch(
     output: Path = typer.Option(None, "--output", "-o", help="Output JSON path (default: data/<playlist-name>.json)"),
 ) -> None:
     """Fetch all tracks from a Spotify playlist, enrich with artist genres, save to JSON."""
-    from dj_cli.spotify_client import (
+    from cratekeeper.spotify_client import (
         extract_playlist_id,
         fetch_artist_genres,
         fetch_playlist_tracks,
@@ -73,13 +73,13 @@ def classify(
     enrich: bool = typer.Option(False, "--enrich", "-e", help="Enrich missing genres via MusicBrainz before classifying"),
 ) -> None:
     """Classify tracks into genre buckets and print a summary."""
-    from dj_cli.classifier import classify_tracks, consolidate_small_buckets
+    from cratekeeper.classifier import classify_tracks, consolidate_small_buckets
 
     plan = EventPlan.load(input_file)
     console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks from '{plan.source_playlist_name}'")
 
     if enrich:
-        from dj_cli.musicbrainz_client import enrich_tracks_genres
+        from cratekeeper.musicbrainz_client import enrich_tracks_genres
 
         missing = sum(1 for t in plan.tracks if not t.artist_genres and t.isrc)
         if missing:
@@ -123,7 +123,7 @@ def enrich(
     input_file: Path = typer.Argument(help="Path to fetched/classified playlist JSON"),
 ) -> None:
     """Enrich tracks missing genre data via MusicBrainz ISRC lookup."""
-    from dj_cli.musicbrainz_client import enrich_tracks_genres
+    from cratekeeper.musicbrainz_client import enrich_tracks_genres
 
     plan = EventPlan.load(input_file)
     missing_genres = sum(1 for t in plan.tracks if not t.artist_genres and t.isrc)
@@ -204,7 +204,7 @@ def create_playlists(
     date: str = typer.Option(..., "--date", "-d", help="Event date (e.g., '2026-04-22')"),
 ) -> None:
     """Create Spotify sub-playlists from classified tracks."""
-    from dj_cli.spotify_client import (
+    from cratekeeper.spotify_client import (
         add_tracks_to_playlist,
         create_playlist,
         get_spotify_client,
@@ -242,7 +242,7 @@ def build_masters(
     input_file: Path = typer.Argument(help="Path to classified JSON"),
 ) -> None:
     """Add classified tracks to cross-event [DJ] master playlists on Spotify."""
-    from dj_cli.spotify_client import (
+    from cratekeeper.spotify_client import (
         add_tracks_to_playlist,
         create_playlist,
         get_playlist_track_ids,
@@ -300,7 +300,7 @@ def sync_to_tidal(
     input_file: Path = typer.Argument(help="Path to classified JSON"),
 ) -> None:
     """Sync classified playlists to Tidal via ISRC matching."""
-    from dj_cli.tidal_client import (
+    from cratekeeper.tidal_client import (
         add_tracks_by_isrc,
         create_playlist,
         get_tidal_session,
@@ -352,7 +352,7 @@ def scan(
     full: bool = typer.Option(False, "--full", help="Full re-scan (ignore existing entries)"),
 ) -> None:
     """Scan a local directory for audio files and index their metadata into PostgreSQL."""
-    from dj_cli.local_scanner import get_db_stats, scan_directory
+    from cratekeeper.local_scanner import get_db_stats, scan_directory
 
     console.print(f"Scanning [cyan]{directory}[/cyan] for audio files...")
     if not full:
@@ -387,9 +387,10 @@ def scan(
 def match(
     input_file: Path = typer.Argument(help="Path to classified JSON"),
     fuzzy_threshold: int = typer.Option(85, "--threshold", "-t", help="Fuzzy match threshold (0-100)"),
+    tidal_urls: bool = typer.Option(False, "--tidal-urls", help="Resolve Tidal URLs for missing tracks (requires Tidal auth)"),
 ) -> None:
     """Match classified Spotify tracks to local audio files."""
-    from dj_cli.matcher import match_tracks
+    from cratekeeper.matcher import match_tracks
 
     plan = EventPlan.load(input_file)
 
@@ -423,17 +424,48 @@ def match(
     # Write missing report
     missing = [r.track for r in results if r.method == "none"]
     if missing:
+        # Optionally resolve Tidal URLs for missing tracks
+        tidal_url_map: dict[str, str | None] = {}
+        if tidal_urls:
+            from cratekeeper.tidal_client import get_tidal_session, resolve_tidal_urls
+
+            console.print(f"\nResolving Tidal URLs for [cyan]{len(missing)}[/cyan] missing tracks...")
+            session = get_tidal_session()
+            isrcs = [t.isrc for t in missing if t.isrc]
+
+            def _tidal_progress(i, total, isrc, url):
+                status = f"[green]{url}[/green]" if url else "[dim]not found[/dim]"
+                console.print(f"  [{i}/{total}] {isrc} → {status}")
+
+            tidal_url_map = resolve_tidal_urls(session, isrcs, progress_callback=_tidal_progress)
+            found = sum(1 for u in tidal_url_map.values() if u)
+            console.print(f"Resolved [green]{found}[/green] of {len(isrcs)} Tidal URLs")
+
+        # Write human-readable missing file
         missing_file = input_file.with_suffix(".missing.txt")
-        lines = [f"{t.display_name()} (ISRC: {t.isrc or 'none'})" for t in missing]
+        lines = []
+        for t in missing:
+            line = f"{t.display_name()} (ISRC: {t.isrc or 'none'})"
+            if tidal_urls and t.isrc and tidal_url_map.get(t.isrc):
+                line += f"  {tidal_url_map[t.isrc]}"
+            lines.append(line)
         missing_file.write_text("\n".join(lines))
 
-        # Also write ISRC-only file
+        # Write ISRC-only file
         isrc_file = input_file.with_suffix(".missing-isrcs.txt")
         isrcs = [t.isrc for t in missing if t.isrc]
         isrc_file.write_text("\n".join(isrcs))
 
         console.print(f"[yellow]{len(missing)} unmatched tracks written to {missing_file}[/yellow]")
         console.print(f"[yellow]{len(isrcs)} ISRCs written to {isrc_file}[/yellow]")
+
+        # Write Tidal URLs file if requested
+        if tidal_urls:
+            tidal_file = input_file.with_suffix(".missing-tidal.txt")
+            tidal_lines = [tidal_url_map[t.isrc] for t in missing if t.isrc and tidal_url_map.get(t.isrc)]
+            if tidal_lines:
+                tidal_file.write_text("\n".join(tidal_lines))
+                console.print(f"[yellow]{len(tidal_lines)} Tidal URLs written to {tidal_file}[/yellow]")
 
 
 @app.command(name="analyze-mood")
@@ -444,7 +476,7 @@ def analyze_mood(
 
     Requires essentia — run via Docker if not installed locally.
     """
-    from dj_cli.mood_analyzer import analyze_tracks
+    from cratekeeper.mood_analyzer import analyze_tracks
 
     plan = EventPlan.load(input_file)
     with_path = sum(1 for t in plan.tracks if t.local_path)
@@ -459,24 +491,31 @@ def analyze_mood(
     def _progress(i, total, track, mood, error):
         if error:
             console.print(f"  [{i}/{total}] {track.display_name()} → [red]error: {error}[/red]")
-        elif mood:
-            console.print(f"  [{i}/{total}] {track.display_name()} → [cyan]{mood}[/cyan]")
+        else:
+            parts = []
+            if track.bpm:
+                parts.append(f"{track.bpm} BPM")
+            if track.key:
+                parts.append(track.key)
+            if track.energy:
+                parts.append(f"energy={track.energy}")
+            console.print(f"  [{i}/{total}] {track.display_name()} → [cyan]{', '.join(parts)}[/cyan]")
 
     analyzed = analyze_tracks(plan.tracks, progress_callback=_progress)
     console.print(f"\nAnalyzed [green]{analyzed}[/green] of {with_path} tracks")
 
-    # Mood summary
-    moods: dict[str, int] = {}
+    # Energy summary
+    energies: dict[str, int] = {}
     for t in plan.tracks:
-        if t.mood:
-            moods[t.mood] = moods.get(t.mood, 0) + 1
+        if t.energy:
+            energies[t.energy] = energies.get(t.energy, 0) + 1
 
-    if moods:
-        table = Table(title="Mood Distribution")
-        table.add_column("Mood", style="cyan")
+    if energies:
+        table = Table(title="Energy Distribution")
+        table.add_column("Energy", style="cyan")
         table.add_column("Tracks", justify="right", style="green")
-        for mood, count in sorted(moods.items(), key=lambda x: -x[1]):
-            table.add_row(mood, str(count))
+        for energy, count in sorted(energies.items()):
+            table.add_row(energy, str(count))
         console.print(table)
 
     plan.save(input_file)
@@ -485,22 +524,20 @@ def analyze_mood(
 
 @app.command(name="build-library")
 def build_library_cmd(
-    input_file: Path = typer.Argument(help="Path to classified JSON with local_path and mood"),
+    input_file: Path = typer.Argument(help="Path to classified JSON with local_path"),
     target: Path = typer.Option(Path.home() / "Music" / "Library", "--target", "-t", help="Target directory for the master library"),
 ) -> None:
-    """Copy matched local files into a Genre/Mood/ folder structure."""
-    from dj_cli.library_builder import build_library
+    """Copy matched local files into a Genre/ folder structure."""
+    from cratekeeper.library_builder import build_library
 
     plan = EventPlan.load(input_file)
     candidates = sum(1 for t in plan.tracks if t.local_path)
-    with_mood = sum(1 for t in plan.tracks if t.local_path and t.mood)
-    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks, [cyan]{candidates}[/cyan] with local files, [cyan]{with_mood}[/cyan] with mood")
+    with_bucket = sum(1 for t in plan.tracks if t.local_path and t.bucket)
+    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks, [cyan]{candidates}[/cyan] with local files, [cyan]{with_bucket}[/cyan] with bucket")
 
-    if with_mood == 0 and candidates > 0:
-        console.print("[red]No tracks have mood set. Run 'dj analyze-mood' first.[/red]")
+    if with_bucket == 0 and candidates > 0:
+        console.print("[red]No tracks have a bucket set. Run 'dj classify' first.[/red]")
         raise typer.Exit(1)
-    if with_mood < candidates:
-        console.print(f"[yellow]Warning: {candidates - with_mood} tracks have no mood and will be skipped.[/yellow]")
 
     def _progress(i, total, track, dest_path):
         if i % 20 == 0 or i == total:
@@ -522,11 +559,11 @@ def build_library_cmd(
 
 @app.command(name="build-event")
 def build_event_cmd(
-    input_file: Path = typer.Argument(help="Path to classified JSON with local_path and mood"),
+    input_file: Path = typer.Argument(help="Path to classified JSON with local_path"),
     output: Path = typer.Option(..., "--output", "-o", help="Output directory for event folder (e.g., ~/Music/Events/Wedding/)"),
 ) -> None:
-    """Create an event folder with copies organized by Genre/Mood/."""
-    from dj_cli.event_builder import build_event_folder
+    """Create an event folder with copies organized by Genre/."""
+    from cratekeeper.event_builder import build_event_folder
 
     plan = EventPlan.load(input_file)
     console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks")
@@ -549,12 +586,66 @@ def build_event_cmd(
         console.print(f"[yellow]{len(missing)} tracks written to {output / '_missing.txt'}[/yellow]")
 
 
+@app.command(name="classify-tags")
+def classify_tags(
+    input_file: Path = typer.Argument(help="Path to classified JSON (ideally after analyze-mood)"),
+    provider: str = typer.Option("anthropic", "--provider", "-p", help="LLM provider: anthropic or openai"),
+    model: str = typer.Option(None, "--model", "-m", help="Model name (default: claude-sonnet-4-20250514 / gpt-4o)"),
+    batch_size: int = typer.Option(15, "--batch-size", "-b", help="Tracks per LLM request"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print what would be classified without calling LLM"),
+) -> None:
+    """Classify tracks with structured tags (energy, function, crowd, mood) via LLM."""
+    from cratekeeper.llm_classifier import classify_tracks as llm_classify
+
+    plan = EventPlan.load(input_file)
+    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks")
+
+    if dry_run:
+        with_analysis = sum(1 for t in plan.tracks if t.bpm)
+        console.print(f"[cyan]{with_analysis}[/cyan] have audio analysis data")
+        console.print(f"Would send {len(plan.tracks)} tracks in batches of {batch_size} to {provider}")
+        return
+
+    console.print(f"Classifying tags via [cyan]{provider}[/cyan] (batch size {batch_size})...")
+
+    def _progress(i, total, track, warnings):
+        warn_str = f" [yellow]{'  '.join(warnings)}[/yellow]" if warnings else ""
+        console.print(f"  [{i}/{total}] {track.display_name()}{warn_str}")
+
+    success, errors = llm_classify(
+        plan.tracks, provider=provider, model=model,
+        batch_size=batch_size, progress_callback=_progress,
+    )
+
+    console.print(f"\n[green]{success} classified[/green]", end="")
+    if errors:
+        console.print(f", [red]{errors} errors[/red]")
+    else:
+        console.print()
+
+    # Tag summary
+    energy_dist: dict[str, int] = {}
+    for t in plan.tracks:
+        if t.energy:
+            energy_dist[t.energy] = energy_dist.get(t.energy, 0) + 1
+    if energy_dist:
+        table = Table(title="Energy Distribution")
+        table.add_column("Energy", style="cyan")
+        table.add_column("Tracks", justify="right", style="green")
+        for e, c in sorted(energy_dist.items()):
+            table.add_row(e, str(c))
+        console.print(table)
+
+    plan.save(input_file)
+    console.print(f"Saved to [green]{input_file}[/green]")
+
+
 @app.command()
 def tag(
     input_file: Path = typer.Argument(help="Path to classified JSON with local_path"),
 ) -> None:
-    """Write genre, mood, and era into audio file ID3/FLAC tags."""
-    from dj_cli.tag_writer import tag_tracks
+    """Write genre, BPM, key, and structured tags into audio file ID3/FLAC tags."""
+    from cratekeeper.tag_writer import tag_tracks
 
     plan = EventPlan.load(input_file)
     candidates = sum(1 for t in plan.tracks if t.local_path)

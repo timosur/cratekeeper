@@ -9,8 +9,8 @@ from pathlib import Path
 import psycopg2
 from thefuzz import fuzz
 
-from dj_cli.local_scanner import DEFAULT_DB_URL
-from dj_cli.models import Track
+from cratekeeper.local_scanner import DEFAULT_DB_URL
+from cratekeeper.models import Track
 
 
 def _normalize(text: str) -> str:

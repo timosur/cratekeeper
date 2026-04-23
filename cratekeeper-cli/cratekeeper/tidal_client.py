@@ -58,3 +58,33 @@ def get_user_playlists(session: tidalapi.Session) -> list[dict]:
     """Get all of the user's playlists as dicts with id, name."""
     playlists = session.user.playlist_and_favorite_playlists()
     return [{"id": str(p.id), "name": p.name} for p in playlists]
+
+
+def search_track_by_isrc(session: tidalapi.Session, isrc: str) -> str | None:
+    """Search Tidal for a track by ISRC. Returns a Tidal track URL or None."""
+    try:
+        results = session.search(isrc, models=[tidalapi.media.Track], limit=1)
+        tracks = results.get("tracks") or results.get("top_hit") or []
+        if not tracks:
+            return None
+        track = tracks[0]
+        return f"https://tidal.com/browse/track/{track.id}"
+    except Exception:
+        return None
+
+
+def resolve_tidal_urls(
+    session: tidalapi.Session,
+    isrcs: list[str],
+    progress_callback=None,
+) -> dict[str, str | None]:
+    """Resolve a list of ISRCs to Tidal URLs.
+
+    Returns a dict mapping ISRC → Tidal URL (or None if not found).
+    """
+    results: dict[str, str | None] = {}
+    for i, isrc in enumerate(isrcs):
+        results[isrc] = search_track_by_isrc(session, isrc)
+        if progress_callback:
+            progress_callback(i + 1, len(isrcs), isrc, results[isrc])
+    return results

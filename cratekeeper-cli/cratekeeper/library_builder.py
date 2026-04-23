@@ -1,11 +1,11 @@
-"""Build a master library by copying files into Genre/Mood/ folder structure."""
+"""Build a master library by copying files into Genre/ folder structure."""
 
 from __future__ import annotations
 
 import shutil
 from pathlib import Path
 
-from dj_cli.models import Track
+from cratekeeper.models import Track
 
 
 def _safe_filename(name: str) -> str:
@@ -27,9 +27,9 @@ def build_library(
     target_dir: Path,
     progress_callback=None,
 ) -> tuple[int, int, list[Track]]:
-    """Copy matched local files into Genre/Mood/ structure in the target directory.
+    """Copy matched local files into Genre/ structure in the target directory.
 
-    Only processes tracks that have a local_path and a mood set.
+    Only processes tracks that have a local_path and a bucket set.
     Returns (copied_count, skipped_count, missing_tracks).
     """
     target_dir = Path(target_dir)
@@ -47,17 +47,15 @@ def build_library(
             missing.append(track)
             continue
 
-        # Skip tracks without mood — run analyze-mood first
-        if not track.mood:
+        if not track.bucket:
             missing.append(track)
             continue
 
-        # Build target path: target_dir / Genre / Mood / Artist - Title.ext
-        genre = _safe_filename(track.bucket or "Unsorted")
-        mood = _safe_filename(track.mood)
+        # Build target path: target_dir / Genre / Artist - Title.ext
+        genre = _safe_filename(track.bucket)
         filename = _track_filename(track) + source.suffix
 
-        dest_dir = target_dir / genre / mood
+        dest_dir = target_dir / genre
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest_path = dest_dir / filename
 

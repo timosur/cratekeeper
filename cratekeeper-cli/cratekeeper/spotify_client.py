@@ -7,7 +7,7 @@ from pathlib import Path
 
 import spotipy
 
-from dj_cli.models import Track
+from cratekeeper.models import Track
 
 # Look for spotify-config.json relative to the project root
 _CONFIG_SEARCH_PATHS = [
