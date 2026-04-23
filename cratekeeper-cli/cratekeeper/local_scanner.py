@@ -124,17 +124,26 @@ def _extract_metadata(file_path: Path) -> dict | None:
             except (ValueError, IndexError):
                 pass
 
+    # For MP4/M4A files opened without easy=True, read native atoms.
+    # Also fill in any fields the easy interface missed (e.g. ISRC).
     if isinstance(audio, MP4):
-        mp4_tags = audio.tags or {}
-        title = _first_mp4_tag(mp4_tags, "\xa9nam")
-        artist = _first_mp4_tag(mp4_tags, "\xa9ART")
-        album = _first_mp4_tag(mp4_tags, "\xa9alb")
+        raw = mutagen.File(str(file_path))
+        mp4_tags = raw.tags or {} if raw else {}
+        title = title or _first_mp4_tag(mp4_tags, "\xa9nam")
+        artist = artist or _first_mp4_tag(mp4_tags, "\xa9ART")
+        album = album or _first_mp4_tag(mp4_tags, "\xa9alb")
         date_str = _first_mp4_tag(mp4_tags, "\xa9day")
-        if date_str:
+        if date_str and not year:
             try:
                 year = int(date_str[:4])
             except (ValueError, IndexError):
                 pass
+        # ISRC from freeform atom
+        if not isrc:
+            isrc_raw = mp4_tags.get("----:com.apple.iTunes:ISRC")
+            if isrc_raw:
+                val = isrc_raw[0]
+                isrc = val.decode("utf-8") if isinstance(val, bytes) else str(val)
 
     return {
         "path": str(file_path),

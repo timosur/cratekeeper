@@ -21,7 +21,6 @@ Full pipeline from a Spotify wish playlist to a local event folder with files or
 - **PostgreSQL** — running locally or via Docker; default connection: `postgresql://dj:dj@localhost:5432/djlib` (override with `DATABASE_URL` env var)
 - **spotify MCP server** — connected and authenticated
 - **NAS mounted** at `/Volumes/Music` (or wherever the music library lives)
-- **Anthropic API key** — for LLM tag classification (`ANTHROPIC_API_KEY` env var)
 
 ## Path Reference
 
@@ -144,40 +143,63 @@ Sets preliminary energy classification (low/mid/high) from RMS energy. Show the 
 
 **Important**: This is the only step that requires Docker. The `local_path` values in the JSON use host paths. Docker volume mappings: `/Volumes/Music:/music:ro`, `~/Music/Library:/library`.
 
-### Step 8: Classify Tags via LLM
+### Step 8: Classify Tags via Sub-Agent
 
-```bash
-crate classify-tags data/<slug>.classified.json
+Use `runSubagent` to classify tags. Build a prompt from the classified JSON containing all track metadata and audio analysis, then apply results with `crate apply-tags`.
+
+**8a. Build the sub-agent prompt**
+
+Read `data/<slug>.classified.json` and build a track summary for the prompt. For each track extract: id, name, artists, bucket, era, bpm, key, audio_energy, audio_mood, arousal, valence.
+
+**8b. Call the sub-agent**
+
+```
+runSubagent({
+  description: "Classify DJ tags for tracks",
+  prompt: `You are a professional wedding & event DJ assistant. Classify each track with structured tags.
+
+Valid values:
+- energy: low, mid, high
+- function: floorfiller, singalong, bridge, reset, closer, opener (pick 1-3)
+- crowd: mixed-age, older, younger, family (pick 1-2)
+- mood_tags: feelgood, emotional, euphoric, nostalgic, romantic, melancholic, dark, aggressive, uplifting, dreamy, funky, groovy (pick 1-3)
+- genre_suggestion: null, or one of the 18 genre buckets if the current bucket is clearly wrong
+
+Rules:
+- "floorfiller" = guaranteed dance track for a wide audience
+- "singalong" = tracks most people know the lyrics to
+- "bridge" = transitional track between energy levels or genres
+- "reset" = palate cleanser, calm moment
+- "opener"/"closer" = suitable for opening or closing a set segment
+- For crowd: "mixed-age" means works for all ages, "older" skews 40+, "younger" skews under 30
+- Use audio data (BPM, energy, mood scores, arousal/valence) to inform choices
+
+Tracks:
+${trackLines}
+
+Return ONLY a JSON array, one object per track:
+[{"id": "...", "energy": "...", "function": [...], "crowd": [...], "mood_tags": [...], "genre_suggestion": null}, ...]
+
+Do not include any explanation, just the JSON array.`
+})
 ```
 
-Sends tracks (with all audio analysis data) to Anthropic Claude in batches of 15. The LLM assigns:
-- energy (low/mid/high) — may override the essentia-based preliminary value
-- function tags (floorfiller, singalong, bridge, etc.)
-- crowd tags (mixed-age, older, younger, family)
-- mood tags (feelgood, euphoric, nostalgic, etc.)
-- optional genre re-assignment if the bucket is clearly wrong
-
-Options: `--provider openai`, `--model <name>`, `--batch-size <n>`, `--dry-run`.
-
-Requires `ANTHROPIC_API_KEY` env var (or `OPENAI_API_KEY` for openai provider).
-
-### Step 9: Build Master Library
-
-```bash
-crate build-library data/<slug>.classified.json --target ~/Music/Library
+Where `trackLines` is built like:
+```
+1. id=ABC | "Song Name" by Artist | bucket=Pop | era=2020s | bpm=120 | key=C major | audio_energy=0.5 | mood: happy=0.8 party=0.6 | arousal=6.2 | valence=7.1
 ```
 
-Copies matched files into `~/Music/Library/Genre/Artist - Title.ext`. Skips files without bucket. Updates `local_path` in the JSON.
+**8c. Save the response and apply**
 
-### Step 10: Build Event Folder
+Save the sub-agent's JSON response to `data/<slug>.tags.json`, then run:
 
 ```bash
-crate build-event data/<slug>.classified.json --output ~/Music/Events/<EventName>/
+crate apply-tags data/<slug>.classified.json data/<slug>.tags.json
 ```
 
-Copies files into an event-specific folder with `Genre/` structure. Creates `_missing.txt` for unmatched tracks.
+This validates all tag values and writes them into the classified JSON. Report the results to the user.
 
-### Step 11: Tag Audio Files
+### Step 9: Tag Audio Files
 
 ```bash
 crate tag data/<slug>.classified.json
@@ -188,6 +210,24 @@ Writes metadata into ID3/FLAC tags:
 - **BPM** (TBPM / bpm): beats per minute
 - **Key** (TKEY / initialkey): musical key
 - **Comment** (COMM / comment): structured tags string
+
+**Important**: Tagging must happen before building library/event folders so that copies contain the tags.
+
+### Step 10: Build Master Library
+
+```bash
+crate build-library data/<slug>.classified.json --target ~/Music/Library
+```
+
+Copies matched files into `~/Music/Library/Genre/Artist - Title.ext`. Skips files without bucket. Updates `local_path` in the JSON.
+
+### Step 11: Build Event Folder
+
+```bash
+crate build-event data/<slug>.classified.json --output ~/Music/Events/<EventName>/
+```
+
+Copies files into an event-specific folder with `Genre/` structure. Creates `_missing.txt` for unmatched tracks.
 
 ### Step 12: Report to User
 
@@ -208,10 +248,10 @@ crate enrich data/<slug>.json
 crate classify data/<slug>.json
 crate match data/<slug>.classified.json --tidal-urls
 docker compose run --rm crate analyze-mood /data/<slug>.classified.json
-crate classify-tags data/<slug>.classified.json
+# classify tags via sub-agent + crate apply-tags (see step 8)
+crate tag data/<slug>.classified.json
 crate build-library data/<slug>.classified.json --target ~/Music/Library
 crate build-event data/<slug>.classified.json --output ~/Music/Events/<EventName>/
-crate tag data/<slug>.classified.json
 ```
 
 The scan step can be skipped if the NAS library hasn't changed.

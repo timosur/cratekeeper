@@ -349,7 +349,7 @@ def sync_to_tidal(
 @app.command()
 def scan(
     directory: Path = typer.Argument(help="Path to local music directory (e.g., /Volumes/home/Music/Library)"),
-    full: bool = typer.Option(False, "--full", help="Full re-scan (ignore existing entries)"),
+    full: bool = typer.Option(False, "--full", "--force", help="Full re-scan (ignore existing entries)"),
 ) -> None:
     """Scan a local directory for audio files and index their metadata into PostgreSQL."""
     from cratekeeper.local_scanner import get_db_stats, scan_directory
@@ -586,57 +586,74 @@ def build_event_cmd(
         console.print(f"[yellow]{len(missing)} tracks written to {output / '_missing.txt'}[/yellow]")
 
 
-@app.command(name="classify-tags")
-def classify_tags(
-    input_file: Path = typer.Argument(help="Path to classified JSON (ideally after analyze-mood)"),
-    provider: str = typer.Option("anthropic", "--provider", "-p", help="LLM provider: anthropic or openai"),
-    model: str = typer.Option(None, "--model", "-m", help="Model name (default: claude-sonnet-4-20250514 / gpt-4o)"),
-    batch_size: int = typer.Option(15, "--batch-size", "-b", help="Tracks per LLM request"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Print what would be classified without calling LLM"),
+@app.command(name="apply-tags")
+def apply_tags(
+    input_file: Path = typer.Argument(help="Path to classified JSON"),
+    tags_file: Path = typer.Argument(help="Path to tags JSON (array of {id, energy, function, crowd, mood_tags})"),
 ) -> None:
-    """Classify tracks with structured tags (energy, function, crowd, mood) via LLM."""
-    from cratekeeper.llm_classifier import classify_tracks as llm_classify
+    """Apply pre-classified tags from a JSON file into the classified event plan."""
+    import json as _json
+
+    VALID_ENERGY = {"low", "mid", "high"}
+    VALID_FUNCTION = {"floorfiller", "singalong", "bridge", "reset", "closer", "opener"}
+    VALID_CROWD = {"mixed-age", "older", "younger", "family"}
+    VALID_MOOD = {
+        "feelgood", "emotional", "euphoric", "nostalgic",
+        "romantic", "melancholic", "dark", "aggressive",
+        "uplifting", "dreamy", "funky", "groovy",
+    }
 
     plan = EventPlan.load(input_file)
-    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks")
+    tags_data = _json.loads(tags_file.read_text())
 
-    if dry_run:
-        with_analysis = sum(1 for t in plan.tracks if t.bpm)
-        console.print(f"[cyan]{with_analysis}[/cyan] have audio analysis data")
-        console.print(f"Would send {len(plan.tracks)} tracks in batches of {batch_size} to {provider}")
-        return
+    if not isinstance(tags_data, list):
+        console.print("[red]Tags file must contain a JSON array[/red]")
+        raise typer.Exit(1)
 
-    console.print(f"Classifying tags via [cyan]{provider}[/cyan] (batch size {batch_size})...")
+    track_map = {t.id: t for t in plan.tracks}
+    applied = 0
+    warnings = 0
 
-    def _progress(i, total, track, warnings):
-        warn_str = f" [yellow]{'  '.join(warnings)}[/yellow]" if warnings else ""
-        console.print(f"  [{i}/{total}] {track.display_name()}{warn_str}")
+    for entry in tags_data:
+        tid = entry.get("id")
+        track = track_map.get(tid)
+        if not track:
+            console.print(f"  [yellow]Warning: unknown track id {tid}, skipping[/yellow]")
+            warnings += 1
+            continue
 
-    success, errors = llm_classify(
-        plan.tracks, provider=provider, model=model,
-        batch_size=batch_size, progress_callback=_progress,
-    )
+        # Energy
+        energy = entry.get("energy")
+        if energy and energy in VALID_ENERGY:
+            track.energy = energy
 
-    console.print(f"\n[green]{success} classified[/green]", end="")
-    if errors:
-        console.print(f", [red]{errors} errors[/red]")
-    else:
-        console.print()
+        # Function
+        funcs = entry.get("function", [])
+        track.function = [f for f in funcs if f in VALID_FUNCTION]
 
-    # Tag summary
-    energy_dist: dict[str, int] = {}
-    for t in plan.tracks:
-        if t.energy:
-            energy_dist[t.energy] = energy_dist.get(t.energy, 0) + 1
-    if energy_dist:
-        table = Table(title="Energy Distribution")
-        table.add_column("Energy", style="cyan")
-        table.add_column("Tracks", justify="right", style="green")
-        for e, c in sorted(energy_dist.items()):
-            table.add_row(e, str(c))
-        console.print(table)
+        # Crowd
+        crowd = entry.get("crowd", [])
+        track.crowd = [c for c in crowd if c in VALID_CROWD]
+
+        # Mood tags
+        mood_tags = entry.get("mood_tags", [])
+        track.mood_tags = [m for m in mood_tags if m in VALID_MOOD]
+
+        # Genre re-assignment
+        genre = entry.get("genre_suggestion")
+        if genre and genre != track.bucket:
+            console.print(f"  [cyan]{track.display_name()}[/cyan]: bucket {track.bucket} → {genre}")
+            track.bucket = genre
+
+        applied += 1
+        console.print(f"  [{applied}/{len(tags_data)}] {track.display_name()} → energy={track.energy} func={track.function} crowd={track.crowd} mood={track.mood_tags}")
 
     plan.save(input_file)
+    console.print(f"\n[green]Applied tags to {applied} tracks[/green]", end="")
+    if warnings:
+        console.print(f", [yellow]{warnings} warnings[/yellow]")
+    else:
+        console.print()
     console.print(f"Saved to [green]{input_file}[/green]")
 
 
@@ -666,6 +683,105 @@ def tag(
 
     plan.save(input_file)
     console.print(f"Saved to [green]{input_file}[/green]")
+
+
+@app.command(name="tag-untagged")
+def tag_untagged(
+    input_file: Path = typer.Argument(help="Path to classified JSON"),
+    audio_dir: Path = typer.Argument(help="Directory containing untagged audio files"),
+) -> None:
+    """Write basic metadata (title, artist, album, year, ISRC) into untagged audio files.
+
+    Matches tracks from the classified JSON to audio files by normalizing
+    filenames against track titles. Useful for purchased or acquired files
+    that are missing ID3/MP4 tags.
+    """
+    import unicodedata
+    import re
+    from mutagen.mp4 import MP4
+
+    plan = EventPlan.load(input_file)
+    unmatched = [t for t in plan.tracks if not t.local_path]
+    console.print(
+        f"Loaded [green]{len(plan.tracks)}[/green] tracks, "
+        f"[cyan]{len(unmatched)}[/cyan] without local files"
+    )
+
+    if not audio_dir.is_dir():
+        console.print(f"[red]Directory not found: {audio_dir}[/red]")
+        raise typer.Exit(1)
+
+    # Collect all audio files in directory
+    audio_files: list[Path] = []
+    for ext in ("*.m4a", "*.mp4", "*.flac", "*.mp3"):
+        audio_files.extend(audio_dir.rglob(ext))
+
+    console.print(f"Found [cyan]{len(audio_files)}[/cyan] audio files in {audio_dir}")
+
+    def _norm(text: str) -> str:
+        text = text.lower().strip()
+        text = unicodedata.normalize("NFKD", text)
+        text = "".join(c for c in text if not unicodedata.combining(c))
+        text = re.sub(r"[^\w\s]", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    # Build lookup: normalized stem -> file path
+    file_map: dict[str, Path] = {}
+    for f in audio_files:
+        file_map[_norm(f.stem)] = f
+
+    tagged = 0
+    skipped = 0
+    not_found = 0
+
+    for track in unmatched:
+        norm_title = _norm(track.name)
+        matched_file = file_map.get(norm_title)
+
+        if not matched_file:
+            # Try partial matching
+            for norm_stem, fpath in file_map.items():
+                if norm_title in norm_stem or norm_stem in norm_title:
+                    matched_file = fpath
+                    break
+
+        if not matched_file:
+            console.print(f"  [red]✗[/red] {track.display_name()} → no matching file")
+            not_found += 1
+            continue
+
+        suffix = matched_file.suffix.lower()
+        try:
+            if suffix in (".m4a", ".mp4"):
+                audio = MP4(str(matched_file))
+                audio["\xa9nam"] = [track.name]
+                audio["\xa9ART"] = [", ".join(track.artists)]
+                audio["\xa9alb"] = [track.album]
+                if track.release_year:
+                    audio["\xa9day"] = [str(track.release_year)]
+                if track.isrc:
+                    audio["----:com.apple.iTunes:ISRC"] = [track.isrc.encode("utf-8")]
+                audio.save()
+            else:
+                import mutagen
+                audio = mutagen.File(str(matched_file), easy=True)
+                if audio is None:
+                    raise ValueError("Cannot open file")
+                audio["title"] = track.name
+                audio["artist"] = ", ".join(track.artists)
+                audio["album"] = track.album
+                if track.release_year:
+                    audio["date"] = str(track.release_year)
+                audio.save()
+
+            console.print(f"  [green]✓[/green] {track.display_name()} → {matched_file.name}")
+            tagged += 1
+        except Exception as e:
+            console.print(f"  [red]✗[/red] {track.display_name()} → error: {e}")
+            skipped += 1
+
+    console.print(f"\n[green]Tagged {tagged}[/green], [yellow]{not_found} not found[/yellow], [red]{skipped} errors[/red]")
 
 
 if __name__ == "__main__":

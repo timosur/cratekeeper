@@ -1,10 +1,8 @@
 # Cratekeeper
 
-End-to-end pipeline for turning Spotify wish playlists into classified, audio-analyzed, LLM-tagged local event folders ready for DJing.
+DJ library management toolkit — classify, analyze, tag, and organize music crates from Spotify wish playlists into event-ready folders with genre sorting, audio analysis, and LLM-powered tagging.
 
 ## What It Does
-
-As DJs working events like weddings, we receive large Spotify playlists full of guest wishes — unstructured and in random order. This project takes that chaos and produces:
 
 1. **Genre-classified tracks** — sorted into 18 genre buckets (Schlager → Pop fallback)
 2. **Audio analysis** — BPM, key, energy, danceability, mood classifiers, arousal/valence via essentia + TensorFlow models

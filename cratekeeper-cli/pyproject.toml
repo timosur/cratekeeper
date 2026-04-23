@@ -12,7 +12,6 @@ dependencies = [
     "mutagen>=1.47.0",
     "thefuzz[speedup]>=0.22.0",
     "psycopg2-binary>=2.9.0",
-    "anthropic>=0.40.0",
 ]
 
 [project.scripts]

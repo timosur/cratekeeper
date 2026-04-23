@@ -15,6 +15,7 @@ from pathlib import Path
 import mutagen
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3, TCON, COMM, TBPM, TKEY
+from mutagen.mp4 import MP4
 
 from cratekeeper.models import Track
 
@@ -61,6 +62,8 @@ def tag_track(track: Track) -> bool:
             return _tag_mp3(path, track)
         elif suffix == ".flac":
             return _tag_flac(path, track)
+        elif suffix in (".m4a", ".mp4"):
+            return _tag_m4a(path, track)
         else:
             return _tag_generic(path, track)
     except Exception:
@@ -93,7 +96,7 @@ def _tag_mp3(path: Path, track: Track) -> bool:
     comment = _build_comment(track)
     if comment:
         tags.delall("COMM")
-        tags.add(COMM(encoding=3, lang="eng", desc="dj-tags", text=[comment]))
+        tags.add(COMM(encoding=3, lang="eng", desc="", text=[comment]))
 
     tags.save(str(path))
     return True
@@ -115,6 +118,30 @@ def _tag_flac(path: Path, track: Track) -> bool:
     comment = _build_comment(track)
     if comment:
         audio["comment"] = comment
+
+    audio.save()
+    return True
+
+
+def _tag_m4a(path: Path, track: Track) -> bool:
+    """Write tags to an M4A/MP4 file using iTunes-style atoms."""
+    audio = MP4(str(path))
+
+    if track.bucket:
+        audio["\xa9gen"] = [track.bucket]
+
+    if track.bpm:
+        audio["tmpo"] = [int(round(track.bpm))]
+
+    comment = _build_comment(track)
+    if comment:
+        audio["\xa9cmt"] = [comment]
+
+    # Key — no standard MP4 atom, store as freeform
+    if track.key:
+        audio["----:com.apple.iTunes:initialkey"] = [
+            track.key.encode("utf-8")
+        ]
 
     audio.save()
     return True

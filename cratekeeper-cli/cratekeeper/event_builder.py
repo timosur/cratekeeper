@@ -55,6 +55,7 @@ def build_event_folder(
         target_path = target_dir / filename
 
         if target_path.exists():
+            shutil.copy2(str(source), str(target_path))
             skipped += 1
         else:
             shutil.copy2(str(source), str(target_path))

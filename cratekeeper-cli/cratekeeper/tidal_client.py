@@ -63,8 +63,7 @@ def get_user_playlists(session: tidalapi.Session) -> list[dict]:
 def search_track_by_isrc(session: tidalapi.Session, isrc: str) -> str | None:
     """Search Tidal for a track by ISRC. Returns a Tidal track URL or None."""
     try:
-        results = session.search(isrc, models=[tidalapi.media.Track], limit=1)
-        tracks = results.get("tracks") or results.get("top_hit") or []
+        tracks = session.get_tracks_by_isrc(isrc)
         if not tracks:
             return None
         track = tracks[0]
