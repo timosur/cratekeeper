@@ -188,37 +188,45 @@ def scan_directory(
     skipped = 0
     batch: list[dict] = []
     batch_size = 500
+    interrupted = False
 
     # Use os.walk — much faster than rglob over NAS/SMB (avoids per-file stat)
-    for dirpath, _dirnames, filenames in os.walk(root):
-        for fname in filenames:
-            ext = os.path.splitext(fname)[1].lower()
-            if ext not in AUDIO_EXTENSIONS:
-                continue
+    try:
+        for dirpath, _dirnames, filenames in os.walk(root):
+            for fname in filenames:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext not in AUDIO_EXTENSIONS:
+                    continue
 
-            file_path = Path(dirpath) / fname
+                file_path = Path(dirpath) / fname
 
-            if str(file_path) in existing_paths:
-                skipped += 1
-                if progress_callback and skipped % 500 == 0:
+                if str(file_path) in existing_paths:
+                    skipped += 1
+                    if progress_callback and skipped % 500 == 0:
+                        progress_callback(new_count, skipped, file_path)
+                    continue
+
+                meta = _extract_metadata(file_path)
+                if meta:
+                    batch.append(meta)
+                    new_count += 1
+
+                if len(batch) >= batch_size:
+                    _insert_batch(conn, batch)
+                    batch.clear()
+
+                if progress_callback and (new_count + skipped) % 50 == 0:
                     progress_callback(new_count, skipped, file_path)
-                continue
+    except KeyboardInterrupt:
+        interrupted = True
 
-            meta = _extract_metadata(file_path)
-            if meta:
-                batch.append(meta)
-                new_count += 1
-
-            if len(batch) >= batch_size:
-                _insert_batch(conn, batch)
-                batch.clear()
-
-            if progress_callback and (new_count + skipped) % 50 == 0:
-                progress_callback(new_count, skipped, file_path)
-
-    # Final batch
+    # Flush remaining batch (safe even on interrupt)
     if batch:
         _insert_batch(conn, batch)
+        batch.clear()
+
+    # Checkpoint WAL to main DB file so it's readable cross-platform
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     # Final progress
     if progress_callback:
@@ -233,7 +241,14 @@ def scan_directory(
         "INSERT OR REPLACE INTO scan_meta (key, value) VALUES (?, ?)",
         ("root_path", str(root)),
     )
+    conn.execute(
+        "INSERT OR REPLACE INTO scan_meta (key, value) VALUES (?, ?)",
+        ("status", "interrupted" if interrupted else "complete"),
+    )
     conn.commit()
+
+    # Final WAL checkpoint
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     return conn, new_count, skipped
 
