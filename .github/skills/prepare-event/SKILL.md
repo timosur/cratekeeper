@@ -1,6 +1,6 @@
 ---
 name: prepare-event
-description: 'End-to-end pipeline: Spotify wish playlist → classified, mood-analyzed, tagged local event folder ready for DJing. Use when: preparing a wedding, party, or corporate event from a client wish playlist. Requires: spotify MCP server connected, Docker for essentia mood analysis, NAS mounted at /Volumes/Music.'
+description: 'End-to-end pipeline: Spotify wish playlist → classified, mood-analyzed, tagged local event folder ready for DJing. Use when: preparing a wedding, party, or corporate event from a client wish playlist. Requires: spotify MCP server connected, Docker only for essentia mood analysis, NAS mounted at /Volumes/Music.'
 argument-hint: 'Provide the Spotify playlist URL, event name, and event date'
 ---
 
@@ -16,10 +16,18 @@ Full pipeline from a Spotify wish playlist to a local event folder with files or
 
 ## Required
 
-- **Docker** — all commands run via `docker compose run --rm dj <command>`
+- **Python ≥ 3.11** with `dj-cli` installed locally (`pip install -e ./dj-cli`)
+- **Docker** — only needed for the mood analysis step (essentia requires Linux x86_64)
+- **PostgreSQL** — running locally or via Docker; default connection: `postgresql://dj:dj@localhost:5432/djlib` (override with `DATABASE_URL` env var)
 - **spotify MCP server** — connected and authenticated
 - **NAS mounted** at `/Volumes/Music` (or wherever the music library lives)
-- **docker-compose.yml** mounts: `/Volumes/Music:/music:ro`, `~/Music/Library:/library`, `./data:/data`
+
+## Path Reference
+
+| Context | data dir | NAS music | Library |
+|---------|----------|-----------|---------|
+| **Local** | `data/` | `/Volumes/Music` | `~/Music/Library` |
+| **Docker** (mood only) | `/data` | `/music` | `/library` |
 
 ## Input
 
@@ -30,15 +38,20 @@ The user provides:
 
 ## Procedure
 
-All commands use Docker. The base command is:
+Most commands run locally. Only the mood analysis step uses Docker (essentia binary is Linux x86_64 only).
+
 ```bash
+# Local commands
+dj <command> [args]
+
+# Docker (mood analysis only)
 docker compose run --rm dj <command> [args]
 ```
 
 ### Step 1: Fetch Tracks from Spotify
 
 ```bash
-docker compose run --rm dj fetch "<playlist-url>" --output /data/<slug>.json
+dj fetch "<playlist-url>" --output data/<slug>.json
 ```
 
 Use a URL-safe slug for the filename (e.g., `hochzeitsmaeusse`). Report the track count to the user.
@@ -46,7 +59,7 @@ Use a URL-safe slug for the filename (e.g., `hochzeitsmaeusse`). Report the trac
 ### Step 2: Enrich with MusicBrainz
 
 ```bash
-docker compose run --rm dj enrich /data/<slug>.json
+dj enrich data/<slug>.json
 ```
 
 This queries MusicBrainz for missing genres and original release years via ISRC lookup. Rate-limited at ~1 req/sec. Also computes era labels (80s, 90s, etc.) for all tracks.
@@ -56,17 +69,17 @@ Report: how many tracks enriched, how many had no tags.
 ### Step 3: Classify into Genre Buckets
 
 ```bash
-docker compose run --rm dj classify /data/<slug>.json
+dj classify data/<slug>.json
 ```
 
-This creates `/data/<slug>.classified.json` with genre buckets. Show the classification summary table to the user.
+This creates `data/<slug>.classified.json` with genre buckets. Show the classification summary table to the user.
 
 **Genre buckets** (13 total, ordered by priority): Schlager, DnB, Techno/Melodic, House/Dance, Hip-Hop/R&B, Latin/Reggaeton, Rock/Indie, 80s, 90s, 2000s, Oldschool, Ballads/Slow, Party Hits (fallback).
 
 ### Step 4: Review Classification
 
 ```bash
-docker compose run --rm dj review /data/<slug>.classified.json
+dj review data/<slug>.classified.json
 ```
 
 Show medium/low confidence tracks. Ask user: *"Does this look right? Want me to move any tracks between categories?"*
@@ -76,17 +89,17 @@ If the user wants changes, edit the `.classified.json` directly to change `bucke
 ### Step 5: Scan NAS Library
 
 ```bash
-docker compose run --rm dj scan /music
+dj scan /Volumes/Music
 ```
 
-Indexes all audio files from the NAS into SQLite (`/data/local-library.db`). Uses `os.walk` for streaming progress over SMB. Incremental by default — skips already-indexed files on re-runs.
+Indexes all audio files from the NAS into PostgreSQL (default `postgresql://dj:dj@localhost:5432/djlib`, override with `DATABASE_URL`). Schema is auto-created on first run. Uses `os.walk` for streaming progress over SMB. Incremental by default — skips already-indexed files on re-runs.
 
-If the DB already exists and is recent, this step can be skipped (ask user).
+Use `--full` flag for a complete re-scan ignoring existing entries. If the DB is already populated and recent, this step can be skipped (ask user).
 
 ### Step 6: Match Tracks to Local Files
 
 ```bash
-docker compose run --rm dj match /data/<slug>.classified.json --db /data/local-library.db
+dj match data/<slug>.classified.json
 ```
 
 Matches Spotify tracks to local files using three strategies:
@@ -96,7 +109,7 @@ Matches Spotify tracks to local files using three strategies:
 
 Report the match results table. If many tracks are unmatched, suggest the user check their library or buy missing tracks.
 
-### Step 7: Analyze Mood (essentia)
+### Step 7: Analyze Mood (essentia) — Docker required
 
 ```bash
 docker compose run --rm dj analyze-mood /data/<slug>.classified.json
@@ -108,22 +121,20 @@ Uses essentia (Linux x86_64 via Docker) to extract BPM, energy, danceability fro
 
 Show the mood distribution table.
 
-**Important**: The `local_path` values in the JSON must be accessible inside the container. If `build-library` was run before, paths point to `/library/...`. If only `match` was run, paths point to `/music/...`. Mount accordingly.
+**Important**: This is the only step that requires Docker. The `local_path` values in the JSON use host paths (e.g., `/Volumes/Music/...` or `~/Music/Library/...`). The docker-compose.yml mounts map these into the container (`/Volumes/Music:/music:ro`, `~/Music/Library:/library`). If `build-library` was run before, paths point to `~/Music/Library/...` → `/library/...` inside the container. If only `match` was run, paths point to `/Volumes/Music/...` → `/music/...` inside the container.
 
 ### Step 8: Build Master Library
 
 ```bash
-docker compose run --rm dj build-library /data/<slug>.classified.json --target /library
+dj build-library data/<slug>.classified.json --target ~/Music/Library
 ```
 
-Copies matched files into `~/Music/Library/Genre/Mood/Artist - Title.ext`. Skips files that already exist. Updates `local_path` in the JSON to the new library location.
-
-Default target is `~/Music/Library` (mounted as `/library` in Docker).
+Copies matched files into `~/Music/Library/Genre/Mood/Artist - Title.ext`. Skips files without mood set (run `analyze-mood` first). Skips files that already exist. Updates `local_path` in the JSON to the new library location.
 
 ### Step 9: Build Event Folder
 
 ```bash
-docker compose run --rm dj build-event /data/<slug>.classified.json --output /library/Events/<EventName>/
+dj build-event data/<slug>.classified.json --output ~/Music/Events/<EventName>/
 ```
 
 Copies files into an event-specific folder with the same `Genre/Mood/` structure. Creates `_missing.txt` for unmatched tracks.
@@ -131,7 +142,7 @@ Copies files into an event-specific folder with the same `Genre/Mood/` structure
 ### Step 10: Tag Audio Files
 
 ```bash
-docker compose run --rm dj tag /data/<slug>.classified.json
+dj tag data/<slug>.classified.json
 ```
 
 Writes genre, mood, and era into ID3/FLAC tags:
@@ -152,14 +163,14 @@ Summarize:
 
 If the source playlist was updated:
 ```bash
-docker compose run --rm dj fetch "<playlist-url>" --output /data/<slug>.json
-docker compose run --rm dj enrich /data/<slug>.json
-docker compose run --rm dj classify /data/<slug>.json
-docker compose run --rm dj match /data/<slug>.classified.json
+dj fetch "<playlist-url>" --output data/<slug>.json
+dj enrich data/<slug>.json
+dj classify data/<slug>.json
+dj match data/<slug>.classified.json
 docker compose run --rm dj analyze-mood /data/<slug>.classified.json
-docker compose run --rm dj build-library /data/<slug>.classified.json
-docker compose run --rm dj build-event /data/<slug>.classified.json --output /library/Events/<EventName>/
-docker compose run --rm dj tag /data/<slug>.classified.json
+dj build-library data/<slug>.classified.json --target ~/Music/Library
+dj build-event data/<slug>.classified.json --output ~/Music/Events/<EventName>/
+dj tag data/<slug>.classified.json
 ```
 
 The scan step can be skipped if the NAS library hasn't changed (incremental indexing handles additions).

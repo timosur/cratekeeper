@@ -1,12 +1,13 @@
-"""Scan a local directory for audio files and index metadata into SQLite."""
+"""Scan a local directory for audio files and index metadata into PostgreSQL."""
 
 from __future__ import annotations
 
 import os
-import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+import psycopg2
+import psycopg2.extras
 import mutagen
 from mutagen.easyid3 import EasyID3
 from mutagen.flac import FLAC
@@ -15,37 +16,45 @@ from mutagen.mp4 import MP4
 
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".wav", ".aiff", ".aif", ".m4a", ".ogg", ".opus"}
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "local-library.db"
+DEFAULT_DB_URL = os.environ.get("DATABASE_URL", "postgresql://dj:dj@localhost:5432/djlib")
 
 
-def _init_db(db_path: Path) -> sqlite3.Connection:
-    """Create/open the SQLite database with the tracks table."""
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS tracks (
-            path TEXT PRIMARY KEY,
-            title TEXT,
-            artist TEXT,
-            album TEXT,
-            isrc TEXT,
-            year INTEGER,
-            duration_ms INTEGER,
-            format TEXT,
-            title_norm TEXT,
-            artist_norm TEXT
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_isrc ON tracks(isrc) WHERE isrc IS NOT NULL")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_artist_title ON tracks(artist_norm, title_norm)")
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS scan_meta (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    """)
+def _get_conn(db_url: str | None = None) -> psycopg2.extensions.connection:
+    """Create a PostgreSQL connection and ensure schema exists."""
+    conn = psycopg2.connect(db_url or DEFAULT_DB_URL)
+    conn.autocommit = False
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS tracks (
+                path TEXT PRIMARY KEY,
+                rel_path TEXT,
+                title TEXT,
+                artist TEXT,
+                album TEXT,
+                isrc TEXT,
+                year INTEGER,
+                duration_ms INTEGER,
+                format TEXT,
+                title_norm TEXT,
+                artist_norm TEXT
+            )
+        """)
+        # Migration: add rel_path column if missing (existing DBs)
+        cur.execute("""
+            DO $$ BEGIN
+                ALTER TABLE tracks ADD COLUMN rel_path TEXT;
+            EXCEPTION WHEN duplicate_column THEN NULL;
+            END $$
+        """)
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_rel_path ON tracks(rel_path) WHERE rel_path IS NOT NULL")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_isrc ON tracks(isrc) WHERE isrc IS NOT NULL")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_artist_title ON tracks(artist_norm, title_norm)")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS scan_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
     conn.commit()
     return conn
 
@@ -84,6 +93,7 @@ def _extract_metadata(file_path: Path) -> dict | None:
     if audio is None:
         return {
             "path": str(file_path),
+            "rel_path": None,
             "title": None, "artist": None, "album": None,
             "isrc": None, "year": None, "duration_ms": 0,
             "format": file_path.suffix.lstrip(".").lower(),
@@ -128,6 +138,7 @@ def _extract_metadata(file_path: Path) -> dict | None:
 
     return {
         "path": str(file_path),
+        "rel_path": None,
         "title": title, "artist": artist, "album": album,
         "isrc": isrc.upper() if isrc else None,
         "year": year, "duration_ms": duration_ms,
@@ -158,33 +169,33 @@ def _first_mp4_tag(tags: dict, key: str) -> str | None:
 
 def scan_directory(
     root: Path,
-    db_path: Path = DEFAULT_DB_PATH,
+    db_url: str | None = None,
     incremental: bool = True,
     progress_callback=None,
-) -> tuple[sqlite3.Connection, int, int]:
-    """Recursively scan a directory for audio files and index into SQLite.
+) -> tuple[psycopg2.extensions.connection, int, int, int]:
+    """Recursively scan a directory for audio files and index into PostgreSQL.
 
     Args:
         root: Directory to scan.
-        db_path: Path to SQLite database.
+        db_url: PostgreSQL connection URL.
         incremental: If True, skip files already in the DB.
         progress_callback: Called with (new_count, skipped, file_path).
 
-    Returns (connection, new_count, skipped_count).
+    Returns (connection, new_count, skipped_count, updated_count).
     """
     root = root.resolve()
     if not root.is_dir():
         raise FileNotFoundError(f"Directory not found: {root}")
 
-    conn = _init_db(db_path)
+    conn = _get_conn(db_url)
 
-    # Get existing paths for incremental scan
-    existing_paths: set[str] = set()
-    if incremental:
-        cursor = conn.execute("SELECT path FROM tracks")
-        existing_paths = {row[0] for row in cursor}
+    # Load existing rel_paths for dedup across different mount points
+    with conn.cursor() as cur:
+        cur.execute("SELECT rel_path FROM tracks WHERE rel_path IS NOT NULL")
+        existing_rel_paths = {row[0] for row in cur}
 
     new_count = 0
+    updated_count = 0
     skipped = 0
     batch: list[dict] = []
     batch_size = 500
@@ -199,8 +210,9 @@ def scan_directory(
                     continue
 
                 file_path = Path(dirpath) / fname
+                rel = str(file_path.relative_to(root))
 
-                if str(file_path) in existing_paths:
+                if incremental and rel in existing_rel_paths:
                     skipped += 1
                     if progress_callback and skipped % 500 == 0:
                         progress_callback(new_count, skipped, file_path)
@@ -208,14 +220,18 @@ def scan_directory(
 
                 meta = _extract_metadata(file_path)
                 if meta:
+                    meta["rel_path"] = rel
                     batch.append(meta)
-                    new_count += 1
+                    if rel in existing_rel_paths:
+                        updated_count += 1
+                    else:
+                        new_count += 1
 
                 if len(batch) >= batch_size:
                     _insert_batch(conn, batch)
                     batch.clear()
 
-                if progress_callback and (new_count + skipped) % 50 == 0:
+                if progress_callback and (new_count + updated_count + skipped) % 50 == 0:
                     progress_callback(new_count, skipped, file_path)
     except KeyboardInterrupt:
         interrupted = True
@@ -225,62 +241,99 @@ def scan_directory(
         _insert_batch(conn, batch)
         batch.clear()
 
-    # Checkpoint WAL to main DB file so it's readable cross-platform
-    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-
     # Final progress
     if progress_callback:
         progress_callback(new_count, skipped, None)
 
     # Update scan metadata
-    conn.execute(
-        "INSERT OR REPLACE INTO scan_meta (key, value) VALUES (?, ?)",
-        ("last_scan", datetime.now(timezone.utc).isoformat()),
-    )
-    conn.execute(
-        "INSERT OR REPLACE INTO scan_meta (key, value) VALUES (?, ?)",
-        ("root_path", str(root)),
-    )
-    conn.execute(
-        "INSERT OR REPLACE INTO scan_meta (key, value) VALUES (?, ?)",
-        ("status", "interrupted" if interrupted else "complete"),
-    )
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO scan_meta (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+            ("last_scan", datetime.now(timezone.utc).isoformat()),
+        )
+        cur.execute(
+            "INSERT INTO scan_meta (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+            ("root_path", str(root)),
+        )
+        cur.execute(
+            "INSERT INTO scan_meta (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+            ("status", "interrupted" if interrupted else "complete"),
+        )
     conn.commit()
 
-    # Final WAL checkpoint
-    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-
-    return conn, new_count, skipped
+    return conn, new_count, skipped, updated_count
 
 
-def _insert_batch(conn: sqlite3.Connection, batch: list[dict]) -> None:
-    """Insert a batch of track records into the database."""
-    conn.executemany(
-        """INSERT OR REPLACE INTO tracks
-           (path, title, artist, album, isrc, year, duration_ms, format, title_norm, artist_norm)
-           VALUES (:path, :title, :artist, :album, :isrc, :year, :duration_ms, :format, :title_norm, :artist_norm)""",
-        batch,
-    )
+def _insert_batch(conn: psycopg2.extensions.connection, batch: list[dict]) -> None:
+    """Insert a batch of track records into the database.
+
+    Uses rel_path as the dedup key when available, falling back to path.
+    If a track with the same rel_path already exists (from a different mount),
+    the row is updated including the new absolute path.
+    """
+    with_rel = [d for d in batch if d.get("rel_path")]
+    without_rel = [d for d in batch if not d.get("rel_path")]
+
+    with conn.cursor() as cur:
+        if with_rel:
+            # Delete old rows that would conflict on rel_path but have a different path PK.
+            # This avoids a PK violation when the mount point changed.
+            for d in with_rel:
+                cur.execute(
+                    "DELETE FROM tracks WHERE rel_path = %s AND path != %s",
+                    (d["rel_path"], d["path"]),
+                )
+            psycopg2.extras.execute_values(
+                cur,
+                """INSERT INTO tracks (path, rel_path, title, artist, album, isrc, year, duration_ms, format, title_norm, artist_norm)
+                   VALUES %s
+                   ON CONFLICT (path) DO UPDATE SET
+                       rel_path = EXCLUDED.rel_path,
+                       title = EXCLUDED.title, artist = EXCLUDED.artist, album = EXCLUDED.album,
+                       isrc = EXCLUDED.isrc, year = EXCLUDED.year, duration_ms = EXCLUDED.duration_ms,
+                       format = EXCLUDED.format, title_norm = EXCLUDED.title_norm, artist_norm = EXCLUDED.artist_norm""",
+                [(d["path"], d["rel_path"], d["title"], d["artist"], d["album"], d["isrc"], d["year"],
+                  d["duration_ms"], d["format"], d["title_norm"], d["artist_norm"]) for d in with_rel],
+            )
+        if without_rel:
+            psycopg2.extras.execute_values(
+                cur,
+                """INSERT INTO tracks (path, title, artist, album, isrc, year, duration_ms, format, title_norm, artist_norm)
+                   VALUES %s
+                   ON CONFLICT (path) DO UPDATE SET
+                       title = EXCLUDED.title, artist = EXCLUDED.artist, album = EXCLUDED.album,
+                       isrc = EXCLUDED.isrc, year = EXCLUDED.year, duration_ms = EXCLUDED.duration_ms,
+                       format = EXCLUDED.format, title_norm = EXCLUDED.title_norm, artist_norm = EXCLUDED.artist_norm""",
+                [(d["path"], d["title"], d["artist"], d["album"], d["isrc"], d["year"],
+                  d["duration_ms"], d["format"], d["title_norm"], d["artist_norm"]) for d in without_rel],
+            )
     conn.commit()
 
 
-def get_db_stats(db_path: Path = DEFAULT_DB_PATH) -> dict:
+def get_db_stats(db_url: str | None = None) -> dict:
     """Get summary stats from the library database."""
-    if not db_path.exists():
+    try:
+        conn = _get_conn(db_url)
+    except Exception:
         return {"total": 0}
-    conn = sqlite3.connect(str(db_path))
-    total = conn.execute("SELECT COUNT(*) FROM tracks").fetchone()[0]
-    with_tags = conn.execute("SELECT COUNT(*) FROM tracks WHERE title IS NOT NULL AND artist IS NOT NULL").fetchone()[0]
-    with_isrc = conn.execute("SELECT COUNT(*) FROM tracks WHERE isrc IS NOT NULL").fetchone()[0]
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM tracks")
+        total = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM tracks WHERE title IS NOT NULL AND artist IS NOT NULL")
+        with_tags = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM tracks WHERE isrc IS NOT NULL")
+        with_isrc = cur.fetchone()[0]
 
-    formats = {}
-    for row in conn.execute("SELECT format, COUNT(*) FROM tracks GROUP BY format ORDER BY COUNT(*) DESC"):
-        formats[row[0]] = row[1]
+        formats = {}
+        cur.execute("SELECT format, COUNT(*) FROM tracks GROUP BY format ORDER BY COUNT(*) DESC")
+        for row in cur:
+            formats[row[0]] = row[1]
 
-    last_scan = None
-    row = conn.execute("SELECT value FROM scan_meta WHERE key='last_scan'").fetchone()
-    if row:
-        last_scan = row[0]
+        last_scan = None
+        cur.execute("SELECT value FROM scan_meta WHERE key='last_scan'")
+        row = cur.fetchone()
+        if row:
+            last_scan = row[0]
 
     conn.close()
     return {

@@ -47,9 +47,14 @@ def build_library(
             missing.append(track)
             continue
 
+        # Skip tracks without mood — run analyze-mood first
+        if not track.mood:
+            missing.append(track)
+            continue
+
         # Build target path: target_dir / Genre / Mood / Artist - Title.ext
         genre = _safe_filename(track.bucket or "Unsorted")
-        mood = _safe_filename(track.mood or "Unclassified")
+        mood = _safe_filename(track.mood)
         filename = _track_filename(track) + source.suffix
 
         dest_dir = target_dir / genre / mood

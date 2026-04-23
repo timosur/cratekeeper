@@ -1,15 +1,15 @@
-"""Match Spotify tracks to local audio files using SQLite-backed lookups."""
+"""Match Spotify tracks to local audio files using PostgreSQL-backed lookups."""
 
 from __future__ import annotations
 
 import re
-import sqlite3
 import unicodedata
 from pathlib import Path
 
+import psycopg2
 from thefuzz import fuzz
 
-from dj_cli.local_scanner import DEFAULT_DB_PATH
+from dj_cli.local_scanner import DEFAULT_DB_URL
 from dj_cli.models import Track
 
 
@@ -48,11 +48,11 @@ class MatchResult:
 
 def match_tracks(
     tracks: list[Track],
-    db_path: Path = DEFAULT_DB_PATH,
+    db_url: str | None = None,
     fuzzy_threshold: int = 85,
     progress_callback=None,
 ) -> list[MatchResult]:
-    """Match Spotify tracks to local files using SQLite-backed lookups.
+    """Match Spotify tracks to local files using PostgreSQL-backed lookups.
 
     Strategy order:
     1. ISRC exact match (indexed query)
@@ -60,7 +60,7 @@ def match_tracks(
     3. Fuzzy match on Artist + Title (loads candidates lazily)
     4. Unmatched
     """
-    conn = sqlite3.connect(str(db_path))
+    conn = psycopg2.connect(db_url or DEFAULT_DB_URL)
     matched_paths: set[str] = set()
     results: list[MatchResult] = []
 
@@ -79,53 +79,57 @@ def match_tracks(
 
 def _match_single(
     track: Track,
-    conn: sqlite3.Connection,
+    conn: psycopg2.extensions.connection,
     fuzzy_threshold: int,
     matched_paths: set[str],
 ) -> MatchResult:
     """Try to match a single track using all strategies."""
 
-    # Strategy 1: ISRC (fast indexed lookup)
-    if track.isrc:
-        row = conn.execute(
-            "SELECT path FROM tracks WHERE isrc = ? LIMIT 1",
-            (track.isrc.upper(),),
-        ).fetchone()
-        if row and row[0] not in matched_paths:
-            return MatchResult(track, row[0], "isrc", 100)
+    with conn.cursor() as cur:
+        # Strategy 1: ISRC (fast indexed lookup)
+        if track.isrc:
+            cur.execute(
+                "SELECT path FROM tracks WHERE isrc = %s LIMIT 1",
+                (track.isrc.upper(),),
+            )
+            row = cur.fetchone()
+            if row and row[0] not in matched_paths:
+                return MatchResult(track, row[0], "isrc", 100)
 
-    # Strategy 2: Exact artist + title (normalized, indexed)
-    title_norm = _normalize(track.name)
-    for artist in track.artists:
-        artist_norm = _normalize_artist(artist)
-        row = conn.execute(
-            "SELECT path FROM tracks WHERE artist_norm = ? AND title_norm = ? LIMIT 1",
-            (artist_norm, title_norm),
-        ).fetchone()
-        if row and row[0] not in matched_paths:
-            return MatchResult(track, row[0], "exact", 100)
+        # Strategy 2: Exact artist + title (normalized, indexed)
+        title_norm = _normalize(track.name)
+        for artist in track.artists:
+            artist_norm = _normalize_artist(artist)
+            cur.execute(
+                "SELECT path FROM tracks WHERE artist_norm = %s AND title_norm = %s LIMIT 1",
+                (artist_norm, title_norm),
+            )
+            row = cur.fetchone()
+            if row and row[0] not in matched_paths:
+                return MatchResult(track, row[0], "exact", 100)
 
-    # Strategy 3: Fuzzy match — query candidates with same first letter of artist
-    query = f"{_normalize_artist(track.artists[0])} {_normalize(track.name)}"
-    artist_prefix = _normalize_artist(track.artists[0])[:3]
-    if artist_prefix:
-        candidates = conn.execute(
-            "SELECT path, artist_norm, title_norm FROM tracks WHERE artist_norm LIKE ? AND title_norm IS NOT NULL",
-            (artist_prefix + "%",),
-        ).fetchall()
+        # Strategy 3: Fuzzy match — query candidates with same first letter of artist
+        query = f"{_normalize_artist(track.artists[0])} {_normalize(track.name)}"
+        artist_prefix = _normalize_artist(track.artists[0])[:3]
+        if artist_prefix:
+            cur.execute(
+                "SELECT path, artist_norm, title_norm FROM tracks WHERE artist_norm LIKE %s AND title_norm IS NOT NULL",
+                (artist_prefix + "%",),
+            )
+            candidates = cur.fetchall()
 
-        best_score = 0
-        best_path = None
-        for path, a_norm, t_norm in candidates:
-            if path in matched_paths or not a_norm or not t_norm:
-                continue
-            candidate_str = f"{a_norm} {t_norm}"
-            score = fuzz.token_sort_ratio(query, candidate_str)
-            if score > best_score:
-                best_score = score
-                best_path = path
+            best_score = 0
+            best_path = None
+            for path, a_norm, t_norm in candidates:
+                if path in matched_paths or not a_norm or not t_norm:
+                    continue
+                candidate_str = f"{a_norm} {t_norm}"
+                score = fuzz.token_sort_ratio(query, candidate_str)
+                if score > best_score:
+                    best_score = score
+                    best_path = path
 
-        if best_path and best_score >= fuzzy_threshold:
-            return MatchResult(track, best_path, "fuzzy", best_score)
+            if best_path and best_score >= fuzzy_threshold:
+                return MatchResult(track, best_path, "fuzzy", best_score)
 
     return MatchResult(track, None, "none", 0)

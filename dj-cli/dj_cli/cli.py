@@ -349,13 +349,10 @@ def sync_to_tidal(
 @app.command()
 def scan(
     directory: Path = typer.Argument(help="Path to local music directory (e.g., /Volumes/home/Music/Library)"),
-    db: Path = typer.Option(None, "--db", help="Path to SQLite database (default: data/local-library.db)"),
     full: bool = typer.Option(False, "--full", help="Full re-scan (ignore existing entries)"),
 ) -> None:
-    """Scan a local directory for audio files and index their metadata into SQLite."""
-    from dj_cli.local_scanner import DEFAULT_DB_PATH, get_db_stats, scan_directory
-
-    db_path = db or DEFAULT_DB_PATH
+    """Scan a local directory for audio files and index their metadata into PostgreSQL."""
+    from dj_cli.local_scanner import get_db_stats, scan_directory
 
     console.print(f"Scanning [cyan]{directory}[/cyan] for audio files...")
     if not full:
@@ -363,18 +360,20 @@ def scan(
 
     def _progress(new, skip, path):
         name = path.name if path else "done"
-        console.print(f"  [green]+{new}[/green] new, [dim]{skip} skipped[/dim] — {name}")
+        console.print(f"  [green]+{new} new[/green], [dim]{skip} skipped[/dim] — {name}")
 
-    conn, new_count, skipped = scan_directory(
-        directory, db_path=db_path, incremental=not full, progress_callback=_progress,
+    conn, new_count, skipped, updated_count = scan_directory(
+        directory, incremental=not full, progress_callback=_progress,
     )
     conn.close()
 
-    stats = get_db_stats(db_path)
+    stats = get_db_stats()
     table = Table(title="Scan Summary")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", justify="right", style="green")
     table.add_row("New files indexed", str(new_count))
+    if updated_count:
+        table.add_row("Updated (re-scanned)", str(updated_count))
     table.add_row("Skipped (already indexed)", str(skipped))
     table.add_row("Total in database", str(stats["total"]))
     table.add_row("With title+artist tags", str(stats["with_tags"]))
@@ -383,34 +382,24 @@ def scan(
         table.add_row(f"Format: .{fmt}", str(count))
     console.print(table)
 
-    console.print(f"Database: [green]{db_path}[/green]")
-
 
 @app.command()
 def match(
     input_file: Path = typer.Argument(help="Path to classified JSON"),
-    db: Path = typer.Option(None, "--db", help="Path to SQLite library database (default: data/local-library.db)"),
     fuzzy_threshold: int = typer.Option(85, "--threshold", "-t", help="Fuzzy match threshold (0-100)"),
 ) -> None:
     """Match classified Spotify tracks to local audio files."""
-    from dj_cli.local_scanner import DEFAULT_DB_PATH
     from dj_cli.matcher import match_tracks
 
     plan = EventPlan.load(input_file)
 
-    db_path = db or DEFAULT_DB_PATH
-    if not db_path.exists():
-        console.print(f"[red]Library database not found: {db_path}[/red]")
-        console.print("Run 'dj scan <directory>' first to create the local library index.")
-        raise typer.Exit(1)
-
-    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks, matching against [cyan]{db_path}[/cyan]...")
+    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks, matching against PostgreSQL...")
 
     def _progress(i, total, track, result):
         if result.local_path:
             console.print(f"  [{i}/{total}] {track.display_name()} → [green]{result.method}[/green] ({result.score}%)")
 
-    results = match_tracks(plan.tracks, db_path=db_path, fuzzy_threshold=fuzzy_threshold, progress_callback=_progress)
+    results = match_tracks(plan.tracks, fuzzy_threshold=fuzzy_threshold, progress_callback=_progress)
 
     # Summary
     by_method: dict[str, int] = {}
@@ -504,7 +493,14 @@ def build_library_cmd(
 
     plan = EventPlan.load(input_file)
     candidates = sum(1 for t in plan.tracks if t.local_path)
-    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks, [cyan]{candidates}[/cyan] with local files")
+    with_mood = sum(1 for t in plan.tracks if t.local_path and t.mood)
+    console.print(f"Loaded [green]{len(plan.tracks)}[/green] tracks, [cyan]{candidates}[/cyan] with local files, [cyan]{with_mood}[/cyan] with mood")
+
+    if with_mood == 0 and candidates > 0:
+        console.print("[red]No tracks have mood set. Run 'dj analyze-mood' first.[/red]")
+        raise typer.Exit(1)
+    if with_mood < candidates:
+        console.print(f"[yellow]Warning: {candidates - with_mood} tracks have no mood and will be skipped.[/yellow]")
 
     def _progress(i, total, track, dest_path):
         if i % 20 == 0 or i == total:

@@ -96,18 +96,36 @@ def analyze_track(file_path: str | Path, genre: str | None = None) -> tuple[Audi
     return features, mood
 
 
+def _remap_path(file_path: str) -> str:
+    """Remap host paths to container paths when running inside Docker."""
+    if not Path("/.dockerenv").exists():
+        return file_path
+    # Docker volume mappings from docker-compose.yml
+    mappings = [
+        ("/Volumes/home/Music/", "/music/"),
+        (str(Path.home() / "Music" / "Library") + "/", "/library/"),
+    ]
+    for host_prefix, container_prefix in mappings:
+        if file_path.startswith(host_prefix):
+            return container_prefix + file_path[len(host_prefix):]
+    return file_path
+
+
 def analyze_tracks(tracks: list, progress_callback=None) -> int:
     """Analyze mood for tracks that have a local_path set.
 
     Mutates tracks: sets mood field.
     Returns number of tracks analyzed.
     """
-    candidates = [t for t in tracks if t.local_path and Path(t.local_path).exists()]
+    candidates = [
+        t for t in tracks
+        if t.local_path and Path(_remap_path(t.local_path)).exists()
+    ]
     analyzed = 0
 
     for i, track in enumerate(candidates):
         try:
-            features, mood = analyze_track(track.local_path, genre=track.bucket)
+            features, mood = analyze_track(_remap_path(track.local_path), genre=track.bucket)
             track.mood = mood
             analyzed += 1
         except Exception as e:

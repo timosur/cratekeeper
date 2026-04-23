@@ -11,6 +11,7 @@ dependencies = [
     "requests>=2.31.0",
     "mutagen>=1.47.0",
     "thefuzz[speedup]>=0.22.0",
+    "psycopg2-binary>=2.9.0",
 ]
 
 [project.scripts]

@@ -1,8 +1,9 @@
 FROM --platform=linux/amd64 python:3.12-slim
 
-# System deps for audio processing
+# System deps for audio processing and PostgreSQL client
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
+        libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install essentia from prebuilt wheel (x86_64 Linux only)
