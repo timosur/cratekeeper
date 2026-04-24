@@ -13,3 +13,6 @@ data/
 *.md
 !README.md
 !.claude/**/*.md
+!plans/*.md
+!plans/**/*.md
+!DESIGN.md
