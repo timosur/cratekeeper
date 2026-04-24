@@ -10,9 +10,4 @@ __pycache__
 .venv
 .DS_Store
 data/
-*.md
-!README.md
-!.claude/**/*.md
-!plans/*.md
-!plans/**/*.md
-!DESIGN.md
+test-results
