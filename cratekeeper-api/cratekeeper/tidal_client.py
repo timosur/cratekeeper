@@ -1,4 +1,4 @@
-"""Tidal API client — wraps tidalapi, reuses tidal-session.json."""
+"""Tidal API client — wraps tidalapi, reads tidal-session.json."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 import tidalapi
 
 _SESSION_SEARCH_PATHS = [
-    Path(__file__).resolve().parent.parent.parent / "tidal-mcp" / "tidal-session.json",
+    Path(__file__).resolve().parent.parent.parent / "data" / "tidal-session.json",
 ]
 
 
@@ -16,8 +16,8 @@ def _find_session_file() -> Path:
         if p.exists():
             return p
     raise FileNotFoundError(
-        "tidal-session.json not found. Run `python -m tidal_mcp.auth` first. "
-        "Expected at: " + ", ".join(str(p) for p in _SESSION_SEARCH_PATHS)
+        "tidal-session.json not found. Re-auth via the Settings page or place the file at: "
+        + ", ".join(str(p) for p in _SESSION_SEARCH_PATHS)
     )
 
 
@@ -27,7 +27,7 @@ def get_tidal_session() -> tidalapi.Session:
     session = tidalapi.Session()
     session.login_session_file(session_file)
     if not session.check_login():
-        raise RuntimeError("Tidal session expired. Re-run `python -m tidal_mcp.auth`.")
+        raise RuntimeError("Tidal session expired. Re-auth via the Settings page.")
     return session
 
 

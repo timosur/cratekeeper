@@ -36,8 +36,8 @@ export function Settings() {
       <section>
         <h2 className="text-sm uppercase tracking-wide text-gray-400 mb-2">Integrations</h2>
         <div className="card grid grid-cols-3 gap-3 text-sm">
-          <Indicator label="Spotify" ok={!!overview?.spotify_configured} hint="Token from spotify-mcp/spotify-config.json (auto-refreshing)" />
-          <Indicator label="Tidal" ok={!!overview?.tidal_configured} hint="Session from tidal-mcp/tidal-session.json" />
+          <Indicator label="Spotify" ok={!!overview?.spotify_configured} hint="Token from data/spotify-config.json (auto-refreshing)" />
+          <Indicator label="Tidal" ok={!!overview?.tidal_configured} hint="Session from data/tidal-session.json" />
           <Indicator label="Anthropic" ok={!!overview?.anthropic_configured} hint="API key required for tag classification" />
         </div>
         <div className="card mt-2 grid grid-cols-2 gap-3 text-xs">

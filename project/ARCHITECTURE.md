@@ -142,10 +142,6 @@ Top-level views:
 
 `postgres:16-alpine` defined in [docker-compose.yml](../docker-compose.yml). Single database `djlib`. Schema authority: the API owns all tables (`tracks`, `events`, `event_tracks`, `jobs`, `checkpoints`, `settings`, `audit_log`, `tag_backups`, `playlist_sync_runs`, etc.).
 
-### 2.5 MCP Servers (Credential Source)
-
-`spotify-mcp/` (TypeScript) and `tidal-mcp/` (Python) implement Model Context Protocol servers. **They are not used by the web app** — the API talks to Spotify and Tidal directly via Python clients in `cratekeeper-api/cratekeeper/`. Their config files (`spotify-config.json`, `tidal-session.json`) are read by the API as a credential source for first-run auth, and the servers themselves remain available as standalone tools for Copilot/Claude Desktop.
-
 ## 3. Key Data Flows
 
 ### 3.1 End-to-end pipeline (web app)

@@ -21,9 +21,7 @@ cratekeeper/
 │   ├── alembic/               # DB migrations
 │   └── pyproject.toml
 ├── cratekeeper-web/       # React + Vite UI
-├── spotify-mcp/           # Spotify MCP server (TypeScript) — credentials source
-├── tidal-mcp/             # Tidal MCP server (Python) — credentials source
-├── data/                  # Event JSON files
+├── data/                  # Event JSON files + Spotify/Tidal credentials
 └── docker-compose.yml
 ```
 
@@ -53,28 +51,15 @@ make db-up
 make migrate
 ```
 
-### 3. Set up the Spotify MCP credentials
+### 3. Set up Spotify credentials
 
-```bash
-cd spotify-mcp
-npm install
-cp spotify-config.example.json spotify-config.json
-# Edit spotify-config.json with your clientId and clientSecret
-npm run auth    # Opens browser for OAuth
-npm run build
-```
+Provide a `data/spotify-config.json` with `clientId`, `clientSecret`, and OAuth tokens. Re-auth from the Settings page in the web UI when tokens expire.
 
-### 4. Set up the Tidal MCP credentials
+### 4. Set up Tidal credentials
 
-```bash
-cd tidal-mcp
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-python -m tidal_mcp.auth   # Prints a link — open it to log in
-```
+Provide a `data/tidal-session.json` produced by an OAuth login. Re-auth from the Settings page when the session expires.
 
-The API reads `spotify-mcp/spotify-config.json` and `tidal-mcp/tidal-session.json` as a credential source for first-run auth.
+The API reads `data/spotify-config.json` and `data/tidal-session.json` as the credential source.
 
 ### 5. Run API + web
 
@@ -180,26 +165,7 @@ All audio data is stored alongside the event and fed to the LLM for informed tag
 
 ## MCP Servers
 
-The MCP servers are kept as a credential source for the API and as standalone tools for Copilot/Claude Desktop. They are **not** required to run the web app once credentials are seeded.
-
-### Spotify MCP (29 tools)
-
-| Category | Tools |
-|----------|-------|
-| Search & Discovery | Search tracks/albums/artists/playlists |
-| Playlist Management | Create, update, add/remove/reorder tracks |
-| Track Analysis | Audio features (BPM, key, energy, danceability), artist genres |
-| Playback Control | Play, pause, skip, queue, volume, devices |
-| Library | Saved tracks, saved albums, recently played |
-
-### Tidal MCP (19 tools)
-
-| Category | Tools |
-|----------|-------|
-| Search & Discovery | Search tracks/albums/artists, track/artist details |
-| Playlist Management | Create, update, add/remove tracks, add by ISRC, merge |
-| Albums | Get album details/tracks, save/remove albums |
-| Favorites | Get/add/remove favorite tracks, artists, albums |
+The standalone Spotify and Tidal MCP servers that previously lived in this repo have been removed. The web app has always talked to Spotify and Tidal directly via the Python clients in `cratekeeper-api/cratekeeper/`; credentials now live under `data/`.
 
 ## Design Decisions
 

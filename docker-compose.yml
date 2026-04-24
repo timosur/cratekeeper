@@ -23,8 +23,7 @@ services:
     ports:
       - "8765:8765"
     volumes:
-      - ./spotify-mcp/spotify-config.json:/spotify-mcp/spotify-config.json:ro
-      - ./tidal-mcp/tidal-session.json:/tidal-mcp/tidal-session.json:ro
+      - ./data:/app/data
       - ~/.cratekeeper:/root/.cratekeeper
       - /Volumes/home/Music:/music:ro
       - ~/Music/Library:/library

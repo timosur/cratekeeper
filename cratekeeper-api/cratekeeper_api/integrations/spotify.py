@@ -31,8 +31,8 @@ class SpotifyAdapter(Protocol):
 class LiveSpotifyAdapter:
     """Real adapter — uses spotipy via cratekeeper.spotify_client.
 
-    Reuses the existing `spotify-mcp/spotify-config.json` for OAuth tokens.
-    Token refresh is handled inside `get_spotify_client()`.
+    Reads OAuth tokens from `data/spotify-config.json`. Token refresh is
+    handled inside `get_spotify_client()`.
     """
 
     def fetch_playlist(self, playlist_url_or_id: str) -> tuple[str, str, list[SpotifyTrackData]]:

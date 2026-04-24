@@ -1,4 +1,4 @@
-"""Spotify API client — wraps spotipy, reuses spotify-config.json tokens."""
+"""Spotify API client — wraps spotipy, reads tokens from spotify-config.json."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ import spotipy
 
 from cratekeeper.models import Track
 
-# Look for spotify-config.json relative to the project root
+# Look for spotify-config.json under the gitignored data/ dir at the project root.
 _CONFIG_SEARCH_PATHS = [
-    Path(__file__).resolve().parent.parent.parent / "spotify-mcp" / "spotify-config.json",
+    Path(__file__).resolve().parent.parent.parent / "data" / "spotify-config.json",
 ]
 
 
@@ -20,7 +20,7 @@ def _find_config() -> Path:
         if p.exists():
             return p
     raise FileNotFoundError(
-        "spotify-config.json not found. Expected at: "
+        "spotify-config.json not found. Re-auth via the Settings page or place the file at: "
         + ", ".join(str(p) for p in _CONFIG_SEARCH_PATHS)
     )
 

@@ -139,10 +139,10 @@ async def tag_vocab_get(db: Session = Depends(get_db)) -> TagVocabularies:
 
 
 # --- OAuth health / re-auth -------------------------------------------------
-# Re-uses the file-based credentials owned by spotify-mcp / tidal-mcp. The
-# "relink" endpoints simply force a fresh client construction and report the
-# resulting health, so a user can confirm credentials work after rotating them
-# without restarting the API.
+# Re-uses the file-based credentials at data/spotify-config.json and
+# data/tidal-session.json. The "relink" endpoints simply force a fresh client
+# construction and report the resulting health, so a user can confirm
+# credentials work after rotating them without restarting the API.
 
 
 @router.get("/auth/spotify")
