@@ -18,7 +18,7 @@ Build a local-first web app (FastAPI + React) that orchestrates the existing cra
 - **Runtime**: local macOS, single-user. Backend + worker run natively on the mac (essentia + TF run locally now — old Docker-only constraint no longer applies). Postgres runs in Docker as today. Models stay on local disk as the CLI uses them. Production hosting deferred beyond v1.
 - **Jobs**: in-process asyncio queue inside FastAPI (no separate worker process in v1). Crash recovery handled via DB checkpoints.
 - **Integrations**: reimplement Spotify/Tidal in Python against their REST APIs; the existing `spotify-mcp` / `tidal-mcp` servers are not used by the web app. Both Spotify and Tidal use an in-app OAuth flow for first-run auth and re-auth (the skill delegates Spotify auth to the MCP today; the web app can't).
-- **LLM tag classification**: move from Claude Code's `runSubagent` (used by the [prepare-event skill](../../.github/skills/prepare-event/SKILL.md) today) to a direct Anthropic API call from the backend using the `anthropic` Python SDK. Enable prompt caching on the fixed instruction block. Surface token usage and estimated cost in the UI before the user triggers the job (`runSubagent` was effectively free under the Claude Code subscription; the API bills per token). Tag vocabularies (`energy/function/crowd/mood`) are fixed in v1 — not user-editable — unlike genre buckets which are.
+- **LLM tag classification**: move from Claude Code's `runSubagent` (used by the prepare-event skill (removed) today) to a direct Anthropic API call from the backend using the `anthropic` Python SDK. Enable prompt caching on the fixed instruction block. Surface token usage and estimated cost in the UI before the user triggers the job (`runSubagent` was effectively free under the Claude Code subscription; the API bills per token). Tag vocabularies (`energy/function/crowd/mood`) are fixed in v1 — not user-editable — unlike genre buckets which are.
 - **LLM genre-suggestions**: the classifier returns an optional `genre_suggestion` per track. These are surfaced in a dedicated review lane after tagging (separate from tag corrections), user bulk-accepts or ignores.
 - **Stale-build invalidation**: re-running Tagging marks library and event-folder builds as stale; the UI prompts for a rebuild (does not auto-rebuild — files are large).
 - **Quality gate**: a pre-flight Quality Checks panel runs before the destructive steps (tag-write, build-event, sync). Warnings are advisory; failures require explicit override.
@@ -27,22 +27,22 @@ Build a local-first web app (FastAPI + React) that orchestrates the existing cra
 
 ### Relevant files (reused across milestones)
 
-- [cratekeeper-cli/cratekeeper/cli.py](../../cratekeeper-cli/cratekeeper/cli.py) — command-to-service mapping, workflow sequencing.
-- [cratekeeper-cli/cratekeeper/models.py](../../cratekeeper-cli/cratekeeper/models.py) — canonical Track / EventPlan models.
-- [cratekeeper-cli/cratekeeper/classifier.py](../../cratekeeper-cli/cratekeeper/classifier.py) — classification logic.
-- [cratekeeper-cli/cratekeeper/matcher.py](../../cratekeeper-cli/cratekeeper/matcher.py) — local matching engine; `progress_callback(i, total, track, result)` pattern.
-- [cratekeeper-cli/cratekeeper/mood_analyzer.py](../../cratekeeper-cli/cratekeeper/mood_analyzer.py) — essentia + TF; long-running audio analysis integration points.
-- [cratekeeper-cli/cratekeeper/event_builder.py](../../cratekeeper-cli/cratekeeper/event_builder.py) — event folder output and report generation.
-- [cratekeeper-cli/cratekeeper/library_builder.py](../../cratekeeper-cli/cratekeeper/library_builder.py) — master/library build.
-- [cratekeeper-cli/cratekeeper/tag_writer.py](../../cratekeeper-cli/cratekeeper/tag_writer.py) — in-place metadata writes; needs backup + undo.
-- [.github/skills/prepare-event/SKILL.md](../../.github/skills/prepare-event/SKILL.md) — current manual pipeline; step 8 uses Claude Code `runSubagent` that the backend must replace with a direct Anthropic API call.
-- [cratekeeper-cli/cratekeeper/cli.py:589](../../cratekeeper-cli/cratekeeper/cli.py) — `apply-tags` command; the backend LLM classifier writes the same `data/<slug>.tags.json` format this command consumes, so existing logic is reused.
-- [cratekeeper-cli/cratekeeper/spotify_client.py](../../cratekeeper-cli/cratekeeper/spotify_client.py) — Spotify API integration.
-- [cratekeeper-cli/cratekeeper/tidal_client.py](../../cratekeeper-cli/cratekeeper/tidal_client.py) — Tidal API/session.
-- [cratekeeper-cli/cratekeeper/musicbrainz_client.py](../../cratekeeper-cli/cratekeeper/musicbrainz_client.py) — enforces 1 req/sec rate limit.
-- [cratekeeper-cli/cratekeeper/local_scanner.py](../../cratekeeper-cli/cratekeeper/local_scanner.py) — owns the canonical `tracks` postgres schema; extend, don't duplicate.
-- [cratekeeper-cli/cratekeeper/genre_buckets.py](../../cratekeeper-cli/cratekeeper/genre_buckets.py) — 18 hardcoded buckets; migrate to DB-backed config.
-- [cratekeeper-cli/cratekeeper/mood_config.py](../../cratekeeper-cli/cratekeeper/mood_config.py) — genre-specific thresholds; migrate to DB-backed config.
+- [cratekeeper-api/cratekeeper/cli.py](../../cratekeeper-api/cratekeeper/cli.py) — command-to-service mapping, workflow sequencing.
+- [cratekeeper-api/cratekeeper/models.py](../../cratekeeper-api/cratekeeper/models.py) — canonical Track / EventPlan models.
+- [cratekeeper-api/cratekeeper/classifier.py](../../cratekeeper-api/cratekeeper/classifier.py) — classification logic.
+- [cratekeeper-api/cratekeeper/matcher.py](../../cratekeeper-api/cratekeeper/matcher.py) — local matching engine; `progress_callback(i, total, track, result)` pattern.
+- [cratekeeper-api/cratekeeper/mood_analyzer.py](../../cratekeeper-api/cratekeeper/mood_analyzer.py) — essentia + TF; long-running audio analysis integration points.
+- [cratekeeper-api/cratekeeper/event_builder.py](../../cratekeeper-api/cratekeeper/event_builder.py) — event folder output and report generation.
+- [cratekeeper-api/cratekeeper/library_builder.py](../../cratekeeper-api/cratekeeper/library_builder.py) — master/library build.
+- [cratekeeper-api/cratekeeper/tag_writer.py](../../cratekeeper-api/cratekeeper/tag_writer.py) — in-place metadata writes; needs backup + undo.
+- prepare-event skill (removed) — current manual pipeline; step 8 uses Claude Code `runSubagent` that the backend must replace with a direct Anthropic API call.
+- [cratekeeper-api/cratekeeper/cli.py:589](../../cratekeeper-api/cratekeeper/cli.py) — `apply-tags` command; the backend LLM classifier writes the same `data/<slug>.tags.json` format this command consumes, so existing logic is reused.
+- [cratekeeper-api/cratekeeper/spotify_client.py](../../cratekeeper-api/cratekeeper/spotify_client.py) — Spotify API integration.
+- [cratekeeper-api/cratekeeper/tidal_client.py](../../cratekeeper-api/cratekeeper/tidal_client.py) — Tidal API/session.
+- [cratekeeper-api/cratekeeper/musicbrainz_client.py](../../cratekeeper-api/cratekeeper/musicbrainz_client.py) — enforces 1 req/sec rate limit.
+- [cratekeeper-api/cratekeeper/local_scanner.py](../../cratekeeper-api/cratekeeper/local_scanner.py) — owns the canonical `tracks` postgres schema; extend, don't duplicate.
+- [cratekeeper-api/cratekeeper/genre_buckets.py](../../cratekeeper-api/cratekeeper/genre_buckets.py) — 18 hardcoded buckets; migrate to DB-backed config.
+- [cratekeeper-api/cratekeeper/mood_config.py](../../cratekeeper-api/cratekeeper/mood_config.py) — genre-specific thresholds; migrate to DB-backed config.
 - [docker-compose.yml](../../docker-compose.yml) — postgres runs here; the `crate` container stays for CLI use but is not part of the web app runtime.
 - [data/wedding-test.json](../../data/wedding-test.json), [.classified.json](../../data/wedding-test.classified.json), [.tags.json](../../data/wedding-test.tags.json) — workflow fixtures.
 

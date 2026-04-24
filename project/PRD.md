@@ -56,16 +56,15 @@ The DJ needs **one tool** that does intake → classification → matching → a
 
 **Secondary use cases:**
 
-- Run the same pipeline from VS Code Copilot via the `prepare-event` skill (CLI-driven).
 - Maintain a global on-disk master library that grows as events are processed.
 - Re-tag an existing event after improving the LLM prompt or audio analysis, then rebuild only what changed.
 
 ## 5. Scope — Functional Requirements
 
-### 5.1 Pipeline (12 steps, both CLI and Web)
+### 5.1 Pipeline (12 steps)
 
 1. **Fetch** — Pull a Spotify playlist into local JSON.
-2. **Enrich** *(CLI)* — MusicBrainz genre/year fill-in (rate-limited 1 req/s).
+2. **Enrich** — MusicBrainz genre/year fill-in (rate-limited 1 req/s).
 3. **Classify** — Rule-based assignment into 18 genre buckets.
 4. **Review** — Surface low-confidence classifications; bulk re-bucket.
 5. **Scan** — Index local NAS into Postgres (incremental + full).
@@ -134,8 +133,7 @@ Every state-changing action funnels through `services/audit.record(...)` and is 
 
 ## 9. References
 
-- [README.md](../README.md) — install, CLI commands, full pipeline walkthrough.
+- [README.md](../README.md) — install, web app + pipeline walkthrough.
 - [DESIGN.md](../DESIGN.md) — visual design system.
 - [plans/ui/README.md](../plans/ui/README.md) — v1 plan index.
 - [plans/ui/STATUS.md](../plans/ui/STATUS.md) — shipped vs. planned.
-- [.github/skills/prepare-event/SKILL.md](../.github/skills/prepare-event/SKILL.md) — Copilot-driven CLI workflow.

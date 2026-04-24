@@ -1,6 +1,6 @@
 """Initial schema — all backend-owned tables.
 
-Coexistence: the existing `tracks` table (owned by cratekeeper-cli/local_scanner.py)
+Coexistence: the existing `tracks` table (owned by cratekeeper-api/local_scanner.py)
 is created with `CREATE TABLE IF NOT EXISTS` here so a fresh install also works
 without first running the CLI scanner. The columns mirror local_scanner._get_conn
 exactly.
@@ -236,4 +236,4 @@ def downgrade() -> None:
         "events",
     ]:
         op.drop_table(tbl)
-    # Intentionally leave `tracks` and `scan_meta` (owned by cratekeeper-cli).
+    # Intentionally leave `tracks` and `scan_meta` (owned by cratekeeper-api).

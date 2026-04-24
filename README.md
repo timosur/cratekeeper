@@ -15,27 +15,14 @@ DJ library management toolkit — classify, analyze, tag, and organize music cra
 
 ```
 cratekeeper/
-├── cratekeeper-cli/       # CLI pipeline (Python)
-│   ├── cratekeeper/
-│   │   ├── cli.py             # All CLI commands
-│   │   ├── models.py          # Track, EventPlan data models
-│   │   ├── genre_buckets.py   # 18 genre bucket definitions
-│   │   ├── classifier.py      # Rule-based genre classification
-│   │   ├── mood_analyzer.py   # essentia + TF audio analysis
-│   │   ├── mood_config.py     # Genre-specific mood thresholds
-│   │   ├── llm_classifier.py  # LLM batch tag classification
-│   │   ├── tag_writer.py      # ID3/FLAC tag writing
-│   │   ├── event_builder.py   # Build event folder (Genre/)
-│   │   ├── library_builder.py # Build master library (Genre/)
-│   │   ├── matcher.py         # Match Spotify tracks to local files
-│   │   ├── spotify_client.py  # Spotify API wrapper
-│   │   ├── tidal_client.py    # Tidal sync
-│   │   ├── musicbrainz_client.py  # MusicBrainz genre/year enrichment
-│   │   └── local_scanner.py   # PostgreSQL audio file indexer
-│   ├── Dockerfile             # essentia + TF models (Linux x86_64)
+├── cratekeeper-api/       # FastAPI backend (Python) — orchestrates the full pipeline
+│   ├── cratekeeper_api/       # API: routes, services, jobs, integrations
+│   ├── cratekeeper/           # Domain engine: classify, analyze, tag, build, sync
+│   ├── alembic/               # DB migrations
 │   └── pyproject.toml
-├── spotify-mcp/           # Spotify MCP server (TypeScript)
-├── tidal-mcp/             # Tidal MCP server (Python)
+├── cratekeeper-web/       # React + Vite UI
+├── spotify-mcp/           # Spotify MCP server (TypeScript) — credentials source
+├── tidal-mcp/             # Tidal MCP server (Python) — credentials source
 ├── data/                  # Event JSON files
 └── docker-compose.yml
 ```
@@ -43,7 +30,8 @@ cratekeeper/
 ## Requirements
 
 - **Python ≥ 3.11**
-- **Docker** — for audio analysis (essentia + TF models require Linux x86_64)
+- **Node ≥ 20** (for the web UI)
+- **Docker** — for audio analysis (essentia + TF models require Linux x86_64) and Postgres
 - **PostgreSQL** — local file index (`postgresql://dj:dj@localhost:5432/djlib`, override with `DATABASE_URL`)
 - **NAS / music library** mounted locally (e.g., `/Volumes/Music`)
 - **Spotify Developer App** — [create one here](https://developer.spotify.com/dashboard)
@@ -52,24 +40,20 @@ cratekeeper/
 
 ## Setup
 
-### 1. Install Cratekeeper
+### 1. Install dependencies
 
 ```bash
-cd cratekeeper-cli
-pip install -e .
+make install      # api (uv) + web (npm)
 ```
 
-This gives you the `crate` command.
-
-### 2. Build Docker Image (for audio analysis)
+### 2. Start Postgres + run migrations
 
 ```bash
-docker compose build
+make db-up
+make migrate
 ```
 
-The Docker image includes essentia, essentia-tensorflow, and 10 pre-trained TF models (~300 MB total) for mood classification, key detection, arousal/valence, and voice/instrumental detection.
-
-### 3. Setup Spotify MCP Server
+### 3. Set up the Spotify MCP credentials
 
 ```bash
 cd spotify-mcp
@@ -80,7 +64,7 @@ npm run auth    # Opens browser for OAuth
 npm run build
 ```
 
-### 4. Setup Tidal MCP Server
+### 4. Set up the Tidal MCP credentials
 
 ```bash
 cd tidal-mcp
@@ -90,93 +74,29 @@ pip install -e .
 python -m tidal_mcp.auth   # Prints a link — open it to log in
 ```
 
-### 5. Connect MCP Servers
+The API reads `spotify-mcp/spotify-config.json` and `tidal-mcp/tidal-session.json` as a credential source for first-run auth.
 
-Add to your MCP client config (VS Code Copilot, Claude Desktop, etc.):
-
-```json
-{
-  "mcpServers": {
-    "spotify": {
-      "command": "node",
-      "args": ["/absolute/path/to/spotify-mcp/build/index.js"]
-    },
-    "tidal": {
-      "command": "/absolute/path/to/tidal-mcp/.venv/bin/python",
-      "args": ["-m", "tidal_mcp.server"]
-    }
-  }
-}
-```
-
-## CLI Commands
-
-All commands use the `crate` CLI:
-
-| Command | Description |
-|---------|-------------|
-| `crate fetch <playlist-url>` | Fetch tracks from Spotify playlist → JSON |
-| `crate enrich <file>` | Enrich missing genres/years via MusicBrainz |
-| `crate classify <file>` | Classify tracks into 18 genre buckets |
-| `crate review <file>` | Show low-confidence classifications for review |
-| `crate scan <directory>` | Index local audio files into PostgreSQL |
-| `crate match <file>` | Match Spotify tracks to local files (ISRC → exact → fuzzy) |
-| `crate match <file> --tidal-urls` | …and resolve Tidal URLs for missing tracks |
-| `crate analyze-mood <file>` | Extract audio features via essentia + TF models (**Docker**) |
-| `crate classify-tags <file>` | Assign structured tags via LLM (energy, function, crowd, mood) |
-| `crate build-library <file>` | Copy files into `Genre/` master library structure |
-| `crate build-event <file>` | Copy files into event-specific `Genre/` folder |
-| `crate tag <file>` | Write genre, BPM, key, and tags into audio file metadata |
-| `crate create-playlists <file>` | Create Spotify sub-playlists per genre bucket |
-| `crate build-masters <file>` | Add tracks to cross-event `[DJ] Genre` master playlists |
-| `crate sync-to-tidal <file>` | Sync classified playlists to Tidal via ISRC |
-
-## Full Pipeline
+### 5. Run API + web
 
 ```bash
-# 1. Fetch wish playlist from Spotify
-crate fetch "https://open.spotify.com/playlist/..." --output data/wedding.json
-
-# 2. Enrich with MusicBrainz genres and release years
-crate enrich data/wedding.json
-
-# 3. Classify into genre buckets
-crate classify data/wedding.json
-# → creates data/wedding.classified.json
-
-# 4. Review classification (optional)
-crate review data/wedding.classified.json
-
-# 5. Scan local music library (skip if already done)
-crate scan /Volumes/Music
-
-# 6. Match tracks to local audio files
-crate match data/wedding.classified.json
-# Add --tidal-urls to get Tidal download links for missing tracks:
-# crate match data/wedding.classified.json --tidal-urls
-# → creates .missing-tidal.txt with URLs
-
-# 7. Analyze audio features (Docker required)
-docker compose run --rm crate analyze-mood /data/wedding.classified.json
-
-# 8. Classify tags via LLM
-crate classify-tags data/wedding.classified.json
-
-# 9. Build master library
-crate build-library data/wedding.classified.json --target ~/Music/Library
-
-# 10. Build event folder
-crate build-event data/wedding.classified.json --output ~/Music/Events/Wedding/
-
-# 11. Write metadata tags into audio files
-crate tag data/wedding.classified.json
-
-# 12. Create Spotify sub-playlists (optional)
-crate create-playlists data/wedding.classified.json --event "Wedding Smith" --date "2026-06-15"
-
-# 13. Sync to Tidal (optional)
-crate sync-to-tidal data/wedding.classified.json
+make dev    # api on :8765 + web on :5173
 ```
+
+## Pipeline (driven via the API / web UI)
+
+1. **Fetch** — pull tracks from a Spotify wish playlist
+2. **Enrich** — fill missing genres / years via MusicBrainz
+3. **Classify** — assign each track to one of 18 genre buckets
+4. **Scan** — index your local audio library into Postgres
+5. **Match** — link Spotify tracks to local files (ISRC → exact → fuzzy)
+6. **Analyze** — extract BPM, key, energy, mood (essentia + TF, Docker)
+7. **Classify tags** — LLM-assigned energy / function / crowd / mood
+8. **Build library** — copy files into the master `Genre/` library
+9. **Build event** — copy files into the event's `Genre/` folder
+10. **Tag** — write genre, BPM, key, and structured tags into audio file metadata
+11. **Sync** — create Spotify sub-playlists and mirror to Tidal
+
+Each step is exposed as a job through the FastAPI backend. Jobs stream progress and logs over SSE; the React UI in `cratekeeper-web/` is the primary control surface.
 
 ## Genre Buckets (18)
 
@@ -207,7 +127,7 @@ Era (80s, 90s, 2000s, Oldschool) is derived from release year and stored as a co
 
 ## Tag System
 
-The LLM classifier (`crate classify-tags`) assigns structured tags based on audio analysis + metadata:
+The LLM tag-classification job assigns structured tags based on audio analysis + metadata:
 
 | Tag | Values | Description |
 |-----|--------|-------------|
@@ -228,7 +148,7 @@ Additional audio metadata written to tags:
 
 ## Audio Analysis (essentia)
 
-The `analyze-mood` command extracts features via Docker (essentia requires Linux x86_64):
+The `analyze` job extracts features via Docker (essentia requires Linux x86_64):
 
 **Basic features** (built-in essentia algorithms):
 - BPM (RhythmExtractor2013)
@@ -243,35 +163,24 @@ The `analyze-mood` command extracts features via Docker (essentia requires Linux
 - Voice / Instrumental detection (discogs-effnet)
 - ML Danceability (discogs-effnet, more accurate than built-in)
 
-All audio data is stored in the event JSON and fed to the LLM for informed tag assignment.
+All audio data is stored alongside the event and fed to the LLM for informed tag assignment.
 
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | For `classify-tags` | — | Anthropic API key |
-| `OPENAI_API_KEY` | If using `--provider openai` | — | OpenAI API key |
+| `ANTHROPIC_API_KEY` | For tag classification | — | Anthropic API key |
+| `OPENAI_API_KEY` | If using OpenAI provider | — | OpenAI API key |
 | `DATABASE_URL` | No | `postgresql://dj:dj@localhost:5432/djlib` | PostgreSQL connection |
+| `CRATEKEEPER_DB_URL` | No | derived from above | API DB URL (psycopg driver) |
+| `CRATEKEEPER_FERNET_KEY` | Yes (prod) | — | Fernet key for the secrets store |
+| `CRATEKEEPER_API_TOKEN` | Yes (prod) | — | Bearer token for API auth |
+| `CRATEKEEPER_CORS_ORIGINS` | No | — | Comma-separated origins for CORS |
 | `ESSENTIA_MODELS_DIR` | No | `/app/models` | Directory for TF model files |
 
-## Docker
-
-The Docker image is used only for audio analysis (essentia + TF models). All other commands run locally.
-
-```bash
-# Build
-docker compose build
-
-# Run audio analysis
-docker compose run --rm crate analyze-mood /data/<file>.classified.json
-
-# The docker-compose.yml maps:
-#   ./data → /data
-#   /Volumes/Music → /music (read-only)
-#   ~/Music/Library → /library
-```
-
 ## MCP Servers
+
+The MCP servers are kept as a credential source for the API and as standalone tools for Copilot/Claude Desktop. They are **not** required to run the web app once credentials are seeded.
 
 ### Spotify MCP (29 tools)
 
@@ -302,9 +211,3 @@ docker compose run --rm crate analyze-mood /data/<file>.classified.json
 - **Docker for essentia only** — essentia + TF require Linux x86_64; everything else runs natively on macOS
 - **Master playlist naming** — `[DJ] Genre` pattern for cross-event playlists
 - **ISRC-first matching** — most reliable way to match Spotify tracks to local files
-
-## Copilot Skill
-
-The `prepare-event` skill automates the full pipeline via GitHub Copilot. Invoke it with a Spotify playlist URL, event name, and date — it runs all steps in sequence with interactive review points.
-
-See [.github/skills/prepare-event/SKILL.md](.github/skills/prepare-event/SKILL.md) for the full procedure.

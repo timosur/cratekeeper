@@ -11,7 +11,7 @@ Harden reliability and safety surfaces, run full verification, and package the l
    - Operation audit log (who did what when, with before/after references).
    - Failure-recovery UI actions built on top of the Milestone 2 resume primitives (retry from checkpoint, skip track, abort + preserve state).
    - Dry-run mode for destructive steps (shows the diff without applying).
-   - **Tag-write backup + undo** for [tag_writer.py](../../cratekeeper-cli/cratekeeper/tag_writer.py): per-track original-tags snapshot at write time, with a restore flow. Dry-run is not a safety net for in-place file edits.
+   - **Tag-write backup + undo** for [tag_writer.py](../../cratekeeper-api/cratekeeper/tag_writer.py): per-track original-tags snapshot at write time, with a restore flow. Dry-run is not a safety net for in-place file edits.
 
 2. **Verification and rollout**:
    - Run integration / E2E tests against real and fixture playlists.

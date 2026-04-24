@@ -33,7 +33,7 @@ Build the React UI: shell, event workflow, master library management, and settin
 4. **Settings / admin UI** (parallel with event + master UIs): integrations settings, local paths, genre bucket editor, mood profile editor, safety toggles.
    - Tidal re-auth lives here: a "Re-connect Tidal" button that kicks off the in-app OAuth flow (redirect → backend callback → return to the UI) and shows the current session health.
    - Anthropic section: API key entry (stored encrypted server-side), model selector (default `claude-sonnet-4-6`), prompt-caching toggle (default on), and a cumulative token/cost readout across jobs.
-   - Back the bucket/mood config with DB tables seeded from the current hardcoded constants in [genre_buckets.py](../../cratekeeper-cli/cratekeeper/genre_buckets.py) and [mood_config.py](../../cratekeeper-cli/cratekeeper/mood_config.py). Keep the CLI reading from the same source — single source of truth. The bucket editor supports drag-reorder; order is semantically meaningful ("first match wins" in classification).
+   - Back the bucket/mood config with DB tables seeded from the current hardcoded constants in [genre_buckets.py](../../cratekeeper-api/cratekeeper/genre_buckets.py) and [mood_config.py](../../cratekeeper-api/cratekeeper/mood_config.py). Keep the CLI reading from the same source — single source of truth. The bucket editor supports drag-reorder; order is semantically meaningful ("first match wins" in classification).
    - Tag vocabularies (`energy` / `function` / `crowd` / `mood`) render as read-only reference in this section — these are fixed in v1 to keep the LLM prompt stable; users can see them but not edit them.
    - Include a macOS-aware filesystem picker with guidance on Full Disk Access for `/Volumes/...` roots.
 

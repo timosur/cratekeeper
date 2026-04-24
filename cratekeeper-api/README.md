@@ -1,6 +1,6 @@
 # Cratekeeper API
 
-FastAPI backend that orchestrates the existing `cratekeeper-cli` pipeline.
+FastAPI backend that orchestrates the existing `cratekeeper-api` pipeline.
 
 This is the M1 + M2-baseline output of the [UI plan](../plans/ui/README.md).
 See [plans/ui/artifacts/](../plans/ui/artifacts/) for architecture, security,
@@ -9,7 +9,7 @@ API contract, and SSE event schemas.
 ## What's implemented
 
 - **M1 design artifacts** — architecture, security, API contract, SSE schemas.
-- **Schema** — Alembic + initial migration for all backend-owned tables (`events`, `event_tracks`, `event_builds`, `event_fetches`, `job_runs`, `job_checkpoints`, `playlist_sync_runs`, `settings`, `genre_buckets`, `mood_thresholds`, `audit_log`). The existing `tracks` table is created idempotently to match `cratekeeper-cli/local_scanner.py`.
+- **Schema** — Alembic + initial migration for all backend-owned tables (`events`, `event_tracks`, `event_builds`, `event_fetches`, `job_runs`, `job_checkpoints`, `playlist_sync_runs`, `settings`, `genre_buckets`, `mood_thresholds`, `audit_log`). The existing `tracks` table is created idempotently to match `cratekeeper-api/local_scanner.py`.
 - **Async job engine** — in-process asyncio runner with global heavy-job semaphore, per-type light semaphores, DB-backed checkpoints, two SSE channels per job (progress + log) plus a per-event fan-out channel.
 - **Job handlers** wired end-to-end: `fetch`, `classify`, `classify-tags`, `refetch`. Other types (`enrich`, `scan-*`, `match`, `analyze-mood`, `apply-tags`, `build-*`, `sync-*`) have their registry slot ready and follow the same pattern.
 - **Integration adapters** — Spotify, Tidal, MusicBrainz, Anthropic. All four currently default to in-process **mocks** (per the user's "mock now, real creds later" decision). Real clients are M2 step 3 work.

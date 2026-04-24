@@ -1,4 +1,4 @@
-"""`classify` job — applies the rule-based genre classifier from cratekeeper-cli
+"""`classify` job — applies the rule-based genre classifier from cratekeeper-api
 against `event_tracks` rows. DB-backed buckets are loaded from `genre_buckets`
 (seeded from the CLI defaults).
 """

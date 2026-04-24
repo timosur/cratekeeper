@@ -3,17 +3,12 @@
 # Conventions:
 #   - api targets run inside cratekeeper-api/ via `uv`
 #   - web targets run inside cratekeeper-web/ via `npm`
-#   - cli targets run inside cratekeeper-cli/ via `uv`
 #   - db targets manage the shared Postgres container from docker-compose.yml
 
 SHELL := /bin/bash
 
 API_DIR := cratekeeper-api
 WEB_DIR := cratekeeper-web
-CLI_DIR := cratekeeper-cli
-
-# Allow passing extra args to commands like `make crate ARGS="fetch --help"`
-ARGS ?=
 
 .DEFAULT_GOAL := help
 
@@ -26,7 +21,7 @@ help: ## Show this help
 ##@ Setup
 
 .PHONY: install
-install: install-api install-web install-cli ## Install all dependencies (api, web, cli)
+install: install-api install-web ## Install all dependencies (api, web)
 
 .PHONY: install-api
 install-api: ## Install api dependencies (uv sync --all-extras)
@@ -35,10 +30,6 @@ install-api: ## Install api dependencies (uv sync --all-extras)
 .PHONY: install-web
 install-web: ## Install web dependencies (npm install)
 	cd $(WEB_DIR) && npm install
-
-.PHONY: install-cli
-install-cli: ## Install cli dependencies (uv sync)
-	cd $(CLI_DIR) && uv sync
 
 ##@ Database
 
@@ -98,20 +89,6 @@ web-build: ## Production build of the web UI
 web-preview: ## Preview the production build
 	cd $(WEB_DIR) && npm run preview
 
-##@ CLI (cratekeeper pipeline)
-
-.PHONY: crate
-crate: ## Run the `crate` CLI (e.g. make crate ARGS="--help")
-	cd $(CLI_DIR) && uv run crate $(ARGS)
-
-.PHONY: cli-build
-cli-build: ## Build the cratekeeper-cli Docker image (essentia + TF models)
-	docker compose build crate
-
-.PHONY: cli-shell
-cli-shell: ## Drop into a shell inside the crate container
-	docker compose run --rm crate bash
-
 ##@ Combined
 
 .PHONY: dev
@@ -133,4 +110,4 @@ clean: ## Remove build artefacts and caches
 .PHONY: nuke
 nuke: clean ## Remove node_modules and .venv directories (full reset)
 	rm -rf $(WEB_DIR)/node_modules
-	rm -rf $(API_DIR)/.venv $(CLI_DIR)/.venv
+	rm -rf $(API_DIR)/.venv

@@ -4,69 +4,70 @@
 
 ## 1. System Overview
 
-Cratekeeper is a single-operator, local-first system. All components run on the DJ's Mac except Postgres (in Docker). Two front doors share one engine and one database:
+Cratekeeper is a single-operator, local-first system. All components run on the DJ's Mac except Postgres (in Docker). One front door, one engine, one database:
 
-- **CLI** (`crate`) — Python entry point; used directly and by the Copilot `prepare-event` skill.
 - **Web app** — FastAPI backend + React/Vite/TS frontend on `localhost`.
 
 ```
                  ┌──────────────────────────┐
-                 │  Operator (browser/CLI)  │
+                 │     Operator (browser)   │
                  └────────────┬─────────────┘
                               │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-        ▼                     ▼                     ▼
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│ cratekeeper- │      │ cratekeeper- │      │ cratekeeper- │
-│   web (SPA)  │─SSE─▶│   api (FastAPI)      │   cli (crate)│
-│ Vite/React/TS│ HTTP │ + asyncio jobs│      │ Click + uv   │
-└──────────────┘      └──────┬───────┘      └──────┬───────┘
-                             │                     │
-                             ├──────── shares ─────┤
-                             ▼                     ▼
-                      ┌────────────────────────────────┐
-                      │ cratekeeper-cli/cratekeeper/*  │
-                      │   (domain engine — Python)     │
-                      │  classifier · matcher ·        │
-                      │  mood_analyzer · tag_writer ·  │
-                      │  event_builder · spotify/tidal │
-                      └─────────────┬──────────────────┘
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              ▼                     ▼                     ▼
-       ┌────────────┐       ┌────────────────┐    ┌──────────────┐
-       │ PostgreSQL │       │  Local NAS     │    │ External APIs│
-       │  (Docker)  │       │ /Volumes/Music │    │ Spotify/Tidal│
-       │  + Alembic │       │  ~/.cratekeeper│    │ MusicBrainz  │
-       └────────────┘       └────────────────┘    │ Anthropic    │
-                                                  └──────────────┘
+                              ▼
+                    ┌──────────────────┐
+                    │ cratekeeper-web  │
+                    │  Vite/React/TS   │
+                    └────────┬─────────┘
+                       HTTP / SSE
+                              ▼
+                    ┌──────────────────┐
+                    │ cratekeeper-api  │
+                    │ FastAPI + asyncio│
+                    │      jobs        │
+                    └────────┬─────────┘
+                             │
+                             ▼
+              ┌────────────────────────────────┐
+              │ cratekeeper-api/cratekeeper/*  │
+              │   (domain engine — Python)     │
+              │  classifier · matcher ·        │
+              │  mood_analyzer · tag_writer ·  │
+              │  event_builder · spotify/tidal │
+              └─────────────┬──────────────────┘
+                            │
+      ┌─────────────────────┼─────────────────────┐
+      ▼                     ▼                     ▼
+┌────────────┐       ┌────────────────┐    ┌──────────────┐
+│ PostgreSQL │       │  Local NAS     │    │ External APIs│
+│  (Docker)  │       │ /Volumes/Music │    │ Spotify/Tidal│
+│  + Alembic │       │  ~/.cratekeeper│    │ MusicBrainz  │
+└────────────┘       └────────────────┘    │ Anthropic    │
+                                           └──────────────┘
 ```
 
-Postgres is the **single source of truth** shared by the CLI and the API. Both the CLI's `local_scanner` and the API write to the same `tracks` table; the API extends the schema (events, jobs, checkpoints, audit, settings, tag_backups) via Alembic.
+Postgres is the **single source of truth**. The API owns the full schema (tracks, events, jobs, checkpoints, audit, settings, tag_backups) via Alembic.
 
 ## 2. Components
 
-### 2.1 `cratekeeper-cli/` — Domain Engine + CLI
+### 2.1 `cratekeeper-api/cratekeeper/` — Domain Engine
 
-Python package built with `uv`/`pip`. Provides the `crate` CLI and is the canonical home for domain logic — both the CLI commands and the FastAPI handlers import these modules.
+Vendored Python modules that implement the pipeline. Imported directly by the FastAPI handlers.
 
-Key modules ([cratekeeper-cli/cratekeeper](../cratekeeper-cli/cratekeeper/)):
+Key modules ([cratekeeper-api/cratekeeper](../cratekeeper-api/cratekeeper/)):
 
 | Module | Responsibility |
 |--------|----------------|
-| `cli.py` | Click commands; thin shells over the domain modules. |
 | `models.py` | `Track`, `EventPlan` data models — canonical shape for JSON artifacts. |
-| `genre_buckets.py` | 18 genre bucket definitions (DB-backed override in API). |
+| `genre_buckets.py` | 18 genre bucket definitions (DB-backed override). |
 | `classifier.py` | Rule-based bucket assignment. |
 | `mood_analyzer.py` | Essentia + TF audio analysis (Apple Silicon native). |
-| `mood_config.py` | Genre-specific mood thresholds (DB-backed override in API). |
+| `mood_config.py` | Genre-specific mood thresholds (DB-backed override). |
 | `matcher.py` | ISRC → exact → fuzzy local-library matching with `progress_callback`. |
 | `tag_writer.py` | In-place ID3/Vorbis/MP4 writes; produces backup material. |
 | `event_builder.py` | Copy/symlink into `Genre/Artist - Title.ext`. |
 | `library_builder.py` | Master library accumulator. |
-| `local_scanner.py` | NAS indexer; **owns** the `tracks` Postgres schema. |
-| `spotify_client.py` / `tidal_client.py` | Direct REST clients (used by API too). |
+| `local_scanner.py` | NAS indexer; owns the `tracks` Postgres schema. |
+| `spotify_client.py` / `tidal_client.py` | Direct REST clients. |
 | `musicbrainz_client.py` | Rate-limited (1 req/s) MusicBrainz client. |
 
 ### 2.2 `cratekeeper-api/` — FastAPI Backend
@@ -139,11 +140,11 @@ Top-level views:
 
 ### 2.4 Postgres (Docker)
 
-`postgres:16-alpine` defined in [docker-compose.yml](../docker-compose.yml). Single database `djlib`. Schema authority: the CLI owns `tracks`; the API extends with `events`, `event_tracks`, `jobs`, `checkpoints`, `settings`, `audit_log`, `tag_backups`, `playlist_sync_runs`, etc.
+`postgres:16-alpine` defined in [docker-compose.yml](../docker-compose.yml). Single database `djlib`. Schema authority: the API owns all tables (`tracks`, `events`, `event_tracks`, `jobs`, `checkpoints`, `settings`, `audit_log`, `tag_backups`, `playlist_sync_runs`, etc.).
 
-### 2.5 MCP Servers (CLI Workflow Only)
+### 2.5 MCP Servers (Credential Source)
 
-`spotify-mcp/` (TypeScript) and `tidal-mcp/` (Python) implement Model Context Protocol servers used by the Copilot `prepare-event` skill. **They are not used by the web app** — the API talks to Spotify and Tidal directly via Python clients in `cratekeeper-cli/cratekeeper/`. Their config files (`spotify-config.json`, `tidal-session.json`) are read by the API as a credential source for first-run auth.
+`spotify-mcp/` (TypeScript) and `tidal-mcp/` (Python) implement Model Context Protocol servers. **They are not used by the web app** — the API talks to Spotify and Tidal directly via Python clients in `cratekeeper-api/cratekeeper/`. Their config files (`spotify-config.json`, `tidal-session.json`) are read by the API as a credential source for first-run auth, and the servers themselves remain available as standalone tools for Copilot/Claude Desktop.
 
 ## 3. Key Data Flows
 
@@ -158,7 +159,7 @@ Top-level views:
 
 ### 3.2 Tag write + undo
 
-1. `apply-tags` reads `data/<slug>.tags.json` (same shape the CLI produces), backs up each file's bytes to `~/.cratekeeper/tag-backups/<event_id>/<spotify_id>.<ext>`, writes the new tags, records a `tag_backups` row per file.
+1. `apply-tags` reads `data/<slug>.tags.json`, backs up each file's bytes to `~/.cratekeeper/tag-backups/<event_id>/<spotify_id>.<ext>`, writes the new tags, records a `tag_backups` row per file.
 2. Downstream `build-event` and `build-library` rows for this event are marked stale.
 3. `undo-tags` reads the backup rows, restores files, consumes the rows on success.
 
@@ -199,16 +200,14 @@ Top-level views:
 | Tag write reversibility | Per-file byte snapshots + `undo-tags` job. |
 | Stale derivative artifacts | `apply-tags` marks downstream builds stale; UI banners until rebuild. |
 | Crash mid-job | Job moves to `failed`/`cancelled`; user-initiated resume from last checkpoint. |
-| CLI/Web drift | Single Postgres schema; both write through the same domain modules. |
 
 ## 7. Deployment
 
-[docker-compose.yml](../docker-compose.yml) defines four services:
+[docker-compose.yml](../docker-compose.yml) defines three services:
 
 | Service | Image / Build | Port |
 |---------|---------------|------|
 | `db` | `postgres:16-alpine` | 5432 |
-| `crate` | `./cratekeeper-cli` (CLI container, optional) | — |
 | `api` | `./cratekeeper-api` | 8765 |
 | `web` | `./cratekeeper-web` (nginx serving Vite build) | 8080 |
 
@@ -220,7 +219,6 @@ For development, Postgres runs in Docker while the API and the frontend run nati
 
 - **Backend:** `uv run pytest -q` — uses an ephemeral Docker Postgres; mocks Spotify/Tidal/Anthropic via `CRATEKEEPER_TEST_MODE=true`. Coverage spans events, jobs, SSE, dependencies, hardening (audit, dry-run, undo).
 - **Frontend:** `npm run build` (zero TS errors gate) plus Playwright smoke and pipeline specs in [cratekeeper-web/e2e/](../cratekeeper-web/e2e/).
-- **CLI:** exercised end-to-end via the `prepare-event` skill against `data/wedding-test.json` fixtures.
 
 ## 9. Known Gaps
 

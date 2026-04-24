@@ -1,4 +1,4 @@
-"""Spotify adapter — Protocol + live client (delegates to cratekeeper-cli) + mock."""
+"""Spotify adapter — Protocol + live client (delegates to cratekeeper-api) + mock."""
 
 from __future__ import annotations
 

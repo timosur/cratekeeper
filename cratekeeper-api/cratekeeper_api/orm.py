@@ -1,6 +1,6 @@
 """SQLAlchemy ORM models for all backend-owned tables.
 
-The pre-existing `tracks` table (owned by cratekeeper-cli/local_scanner.py) is
+The pre-existing `tracks` table (owned by cratekeeper-api/local_scanner.py) is
 mapped read-only here as `LibraryTrack` so we never duplicate its DDL. New
 tables defined below are additive and migrated by Alembic.
 """
@@ -39,9 +39,9 @@ def _uuid() -> str:
 
 
 class LibraryTrack(Base):
-    """Read/write mapping of the `tracks` table created by cratekeeper-cli's
+    """Read/write mapping of the `tracks` table created by cratekeeper-api's
     `local_scanner.py`. Alembic must NOT create or alter this table — coexistence
-    contract: cratekeeper-cli owns the DDL.
+    contract: cratekeeper-api owns the DDL.
     """
 
     __tablename__ = "tracks"
