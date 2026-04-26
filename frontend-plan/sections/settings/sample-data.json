@@ -1,0 +1,121 @@
+{
+  "_meta": {
+    "models": {
+      "settings": "The top-level container for everything visible on the Settings screen. Holds all four category groups so the UI can render any panel from a single payload.",
+      "integrations": "Connection state for the three external services Cratekeeper depends on: Spotify, Tidal, and Anthropic. Each carries enough info to render either a 'connected' or 'not connected' card.",
+      "anthropic": "Anthropic-specific configuration beyond the API key: which model is selected, whether prompt caching is on, and a lifetime token + USD usage counter.",
+      "filesystemRoots": "The three on-disk locations the app reads from and writes to. Each row carries live health data (reachable, free space, last scanned) so the UI can render the per-row badge without an extra fetch.",
+      "buckets": "The editable genre vocabulary used by the Classify step. Each entry has a stable id, display name, current ordering, and a usage counter (how many tracks across all events sit in that bucket).",
+      "apiAccess": "The local-only bearer token clients use to authenticate against the Cratekeeper API. Carries created/last-used timestamps and a masked preview of the value."
+    },
+    "relationships": [
+      "Each Settings payload contains exactly one of: Integrations, FilesystemRoots, Buckets, ApiAccess",
+      "Integrations contains three Service entries (spotify, tidal, anthropic) plus an Anthropic config block",
+      "Buckets are the same vocabulary referenced by every Track's currentBucket / suggestedBucket in Event Detail",
+      "FilesystemRoots health values are produced by the same scan job that the Library section depends on"
+    ]
+  },
+  "settings": {
+    "integrations": {
+      "spotify": {
+        "service": "spotify",
+        "status": "connected",
+        "accountLabel": "timo@cratekeeper.local",
+        "scopes": ["playlist-read-private", "playlist-modify-private", "user-library-read"],
+        "connectedAt": "2026-03-12T08:14:00Z",
+        "lastRefreshedAt": "2026-04-25T07:02:00Z",
+        "expiresAt": "2026-04-25T08:02:00Z"
+      },
+      "tidal": {
+        "service": "tidal",
+        "status": "disconnected",
+        "accountLabel": null,
+        "scopes": [],
+        "connectedAt": null,
+        "lastRefreshedAt": null,
+        "expiresAt": null
+      },
+      "anthropic": {
+        "status": "active",
+        "keyMaskedSuffix": "k7Qz",
+        "keyLastRotatedAt": "2026-02-01T12:00:00Z",
+        "keyValidatedAt": "2026-04-25T07:00:00Z",
+        "model": "claude-sonnet-4",
+        "availableModels": [
+          { "id": "claude-sonnet-4", "label": "Claude Sonnet 4", "recommended": true },
+          { "id": "claude-haiku-4", "label": "Claude Haiku 4", "recommended": false },
+          { "id": "claude-opus-4", "label": "Claude Opus 4", "recommended": false }
+        ],
+        "promptCachingEnabled": true,
+        "lifetimeUsage": {
+          "totalInputTokens": 4820000,
+          "totalOutputTokens": 612000,
+          "totalUsd": 28.74,
+          "since": "2026-02-01T12:00:00Z"
+        }
+      }
+    },
+    "filesystemRoots": [
+      {
+        "id": "root-nas",
+        "label": "Local music NAS",
+        "purpose": "source",
+        "path": "/Volumes/Music",
+        "reachable": true,
+        "freeSpaceBytes": 482000000000,
+        "totalSpaceBytes": 8000000000000,
+        "lastScannedAt": "2026-04-23T11:30:00Z",
+        "fileCount": 47218
+      },
+      {
+        "id": "root-master",
+        "label": "Master library output",
+        "purpose": "library",
+        "path": "~/Music/Library",
+        "reachable": true,
+        "freeSpaceBytes": 124000000000,
+        "totalSpaceBytes": 1000000000000,
+        "lastScannedAt": "2026-04-23T11:34:00Z",
+        "fileCount": 12847
+      },
+      {
+        "id": "root-backup",
+        "label": "Backup directory",
+        "purpose": "backup",
+        "path": "/Volumes/Backup/cratekeeper",
+        "reachable": false,
+        "freeSpaceBytes": null,
+        "totalSpaceBytes": null,
+        "lastScannedAt": "2026-04-22T18:00:00Z",
+        "fileCount": null,
+        "lastError": "Volume not mounted (last seen 2026-04-22T18:00:00Z)"
+      }
+    ],
+    "buckets": [
+      { "id": "bkt-house", "name": "House", "order": 1, "trackCount": 412 },
+      { "id": "bkt-disco", "name": "Disco", "order": 2, "trackCount": 287 },
+      { "id": "bkt-funk-soul", "name": "Funk & Soul", "order": 3, "trackCount": 341 },
+      { "id": "bkt-hip-hop", "name": "Hip-Hop", "order": 4, "trackCount": 264 },
+      { "id": "bkt-rnb", "name": "R&B", "order": 5, "trackCount": 198 },
+      { "id": "bkt-pop", "name": "Pop", "order": 6, "trackCount": 521 },
+      { "id": "bkt-rock", "name": "Rock", "order": 7, "trackCount": 372 },
+      { "id": "bkt-indie", "name": "Indie", "order": 8, "trackCount": 156 },
+      { "id": "bkt-techno", "name": "Techno", "order": 9, "trackCount": 89 },
+      { "id": "bkt-downtempo", "name": "Downtempo", "order": 10, "trackCount": 102 },
+      { "id": "bkt-afro", "name": "Afro & Latin", "order": 11, "trackCount": 134 },
+      { "id": "bkt-reggae", "name": "Reggae & Dub", "order": 12, "trackCount": 47 },
+      { "id": "bkt-dnb", "name": "Drum & Bass", "order": 13, "trackCount": 28 },
+      { "id": "bkt-garage", "name": "UK Garage", "order": 14, "trackCount": 19 },
+      { "id": "bkt-jazz", "name": "Jazz", "order": 15, "trackCount": 73 },
+      { "id": "bkt-classical", "name": "Classical & Score", "order": 16, "trackCount": 0 },
+      { "id": "bkt-world", "name": "World", "order": 17, "trackCount": 41 },
+      { "id": "bkt-misc", "name": "Misc", "order": 18, "trackCount": 12 }
+    ],
+    "apiAccess": {
+      "tokenMaskedSuffix": "9fA2",
+      "createdAt": "2026-02-01T12:00:00Z",
+      "lastUsedAt": "2026-04-25T07:14:00Z",
+      "lastUsedClient": "cratekeeper-cli/0.4.2 (mac)"
+    }
+  }
+}

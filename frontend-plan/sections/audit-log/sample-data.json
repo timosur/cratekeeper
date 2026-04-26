@@ -1,0 +1,1348 @@
+{
+  "_meta": {
+    "models": {
+      "entries": "Each audit entry records one state-changing action \u2014 who or what did it, when, what was changed, and why (when an override reason was supplied).",
+      "filterOptions": "The choices populating the sticky filter bar at the top of the page \u2014 actions grouped by namespace, distinct actors, target kinds, and severities present in the current dataset.",
+      "stats": "Aggregate counts shown in the filter summary line and used by the live-tail indicator (total entries, time of newest entry)."
+    },
+    "relationships": [
+      "Each Entry references one Target (event / track / library / settings / job) by kind + id.",
+      "Each Entry is attributed to one Actor (an operator or the system).",
+      "Job-related entries link back to their originating Job via jobId.",
+      "Override entries carry an overrideReason string; all other severities have null."
+    ]
+  },
+  "stats": {
+    "totalEntries": 1248,
+    "latestEntryAt": "2026-04-25T09:14:18Z"
+  },
+  "entries": [
+    {
+      "id": "audit-2026-04-25-0042",
+      "timestamp": "2026-04-25T09:14:18Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.promote",
+      "target": {
+        "kind": "track",
+        "id": "trk-0002",
+        "label": "Earth, Wind & Fire \u2014 September"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Promoted track to Master Library",
+      "payload": {
+        "before": {
+          "promotedToLibrary": false,
+          "origin": null
+        },
+        "after": {
+          "promotedToLibrary": true,
+          "origin": "promoted",
+          "sourceEventId": "evt-001",
+          "promotedAt": "2026-04-25T09:14:18Z"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-25-0041",
+      "timestamp": "2026-04-25T09:13:55Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.promote",
+      "target": {
+        "kind": "track",
+        "id": "trk-0003",
+        "label": "Daft Punk \u2014 Get Lucky"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Promoted track to Master Library",
+      "payload": {
+        "before": {
+          "promotedToLibrary": false
+        },
+        "after": {
+          "promotedToLibrary": true,
+          "origin": "promoted",
+          "sourceEventId": "evt-001"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-25-0036",
+      "timestamp": "2026-04-25T08:52:30Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.import-spotify",
+      "target": {
+        "kind": "track",
+        "id": "trk-0050",
+        "label": "DJ Fresh \u2014 Gold Dust (Flava D Bootleg)"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Imported track to Master Library from Spotify URL",
+      "payload": {
+        "before": null,
+        "after": {
+          "spotifyUrl": "https://open.spotify.com/track/2J3n9bYp0kRm4xVqL8pWzA",
+          "isrc": "GBKPL1500342",
+          "bucketId": "bucket-uk-garage",
+          "filePath": "/Volumes/Music/library/uk-garage/DJ Fresh - Gold Dust (Flava D Bootleg).flac"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-25-0035",
+      "timestamp": "2026-04-25T08:41:09Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Marcus L."
+      },
+      "action": "review.rebucket",
+      "target": {
+        "kind": "track",
+        "id": "trk-0118",
+        "label": "Caribou \u2014 Volume"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Re-bucketed track from Indie \u2192 Downtempo",
+      "payload": {
+        "before": {
+          "bucketId": "bucket-indie",
+          "bucketName": "Indie",
+          "confidence": 0.42
+        },
+        "after": {
+          "bucketId": "bucket-downtempo",
+          "bucketName": "Downtempo",
+          "confidence": null,
+          "reviewedBy": "marcus.l"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-25-0034",
+      "timestamp": "2026-04-25T08:38:21Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Marcus L."
+      },
+      "action": "review.rebucket",
+      "target": {
+        "kind": "track",
+        "id": "trk-0117",
+        "label": "Yaeji \u2014 Raingurl"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Re-bucketed track from Pop \u2192 House",
+      "payload": {
+        "before": {
+          "bucketId": "bucket-pop",
+          "bucketName": "Pop",
+          "confidence": 0.38
+        },
+        "after": {
+          "bucketId": "bucket-house",
+          "bucketName": "House",
+          "confidence": null,
+          "reviewedBy": "marcus.l"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-25-0033",
+      "timestamp": "2026-04-25T08:22:44Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "job.complete",
+      "target": {
+        "kind": "job",
+        "id": "job-8a3b91",
+        "label": "analyze-mood \u2014 Sarah & Mike Wedding"
+      },
+      "jobId": "job-8a3b91",
+      "severity": "info",
+      "summary": "Mood analysis completed for 142 tracks (3 failures)",
+      "payload": {
+        "before": {
+          "status": "running",
+          "progress": 0.98
+        },
+        "after": {
+          "status": "succeeded",
+          "progress": 1,
+          "durationMs": 1842300,
+          "succeeded": 139,
+          "failed": 3
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-25-0032",
+      "timestamp": "2026-04-25T08:21:50Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "job.checkpoint.fail",
+      "target": {
+        "kind": "track",
+        "id": "trk-0091",
+        "label": "Burial \u2014 Untrue (vinyl rip)"
+      },
+      "jobId": "job-8a3b91",
+      "severity": "warning",
+      "summary": "Mood analysis failed for track (corrupted FLAC header)",
+      "payload": {
+        "before": {
+          "status": "running"
+        },
+        "after": {
+          "status": "failed",
+          "errorCode": "FLAC_HEADER_CORRUPT",
+          "errorMessage": "Invalid frame header at offset 0x4A2C \u2014 re-rip recommended"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-25-0031",
+      "timestamp": "2026-04-25T07:51:14Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "settings.bucket.reorder",
+      "target": {
+        "kind": "settings",
+        "id": "genre-buckets",
+        "label": "Genre buckets"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Reordered genre buckets (moved House to position 1)",
+      "payload": {
+        "before": {
+          "order": [
+            "bucket-pop",
+            "bucket-house",
+            "bucket-disco",
+            "bucket-funk-soul",
+            "bucket-rock",
+            "bucket-rnb",
+            "bucket-hip-hop",
+            "bucket-indie"
+          ]
+        },
+        "after": {
+          "order": [
+            "bucket-house",
+            "bucket-pop",
+            "bucket-disco",
+            "bucket-funk-soul",
+            "bucket-rock",
+            "bucket-rnb",
+            "bucket-hip-hop",
+            "bucket-indie"
+          ]
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-25-0030",
+      "timestamp": "2026-04-25T07:42:08Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "settings.api-key.update",
+      "target": {
+        "kind": "settings",
+        "id": "anthropic-api-key",
+        "label": "Anthropic API key"
+      },
+      "jobId": null,
+      "severity": "warning",
+      "summary": "Updated Anthropic API key",
+      "payload": {
+        "before": {
+          "keyId": "sk-ant-***1f4e",
+          "model": "claude-sonnet-4",
+          "rotatedAt": "2025-11-12T18:30:00Z"
+        },
+        "after": {
+          "keyId": "sk-ant-***9c2a",
+          "model": "claude-sonnet-4",
+          "rotatedAt": "2026-04-25T07:42:08Z"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-24-0089",
+      "timestamp": "2026-04-24T22:18:40Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Marcus L."
+      },
+      "action": "library.remove",
+      "target": {
+        "kind": "track",
+        "id": "trk-0156",
+        "label": "Random One-Off Remix \u2014 Anonymous"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Removed track from Master Library (file preserved on disk)",
+      "payload": {
+        "before": {
+          "promotedToLibrary": true,
+          "origin": "manual",
+          "timesUsed": 0
+        },
+        "after": {
+          "promotedToLibrary": false,
+          "filePreservedAt": "/Volumes/Music/library/misc/Anonymous - Random One-Off Remix.flac"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-24-0087",
+      "timestamp": "2026-04-24T21:48:33Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "gate.override",
+      "target": {
+        "kind": "event",
+        "id": "evt-002",
+        "label": "TechCorp Q1 Kickoff"
+      },
+      "jobId": null,
+      "severity": "override",
+      "summary": "Overrode failing quality gate to build event folder",
+      "payload": {
+        "before": {
+          "qualityGate": {
+            "status": "fail",
+            "failingCount": 1,
+            "warningCount": 3
+          },
+          "blocked": true,
+          "failingChecks": [
+            {
+              "id": "check-untagged-tracks",
+              "label": "All tracks must have tags applied",
+              "detail": "1 track missing tags"
+            }
+          ]
+        },
+        "after": {
+          "qualityGate": {
+            "status": "fail",
+            "failingCount": 1,
+            "warningCount": 3
+          },
+          "blocked": false,
+          "overriddenBy": "tim.s"
+        }
+      },
+      "overrideReason": "Single untagged track is the company anthem (provided by client at last minute) \u2014 they don't need tags applied to it, and the build is needed for tonight's sound check at 6pm."
+    },
+    {
+      "id": "audit-2026-04-24-0086",
+      "timestamp": "2026-04-24T20:33:17Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.promote",
+      "target": {
+        "kind": "track",
+        "id": "trk-0007",
+        "label": "ABBA \u2014 Dancing Queen"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Promoted track to Master Library",
+      "payload": {
+        "before": {
+          "promotedToLibrary": false
+        },
+        "after": {
+          "promotedToLibrary": true,
+          "origin": "promoted",
+          "sourceEventId": "evt-002"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-24-0085",
+      "timestamp": "2026-04-24T19:14:20Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "job.cancel",
+      "target": {
+        "kind": "job",
+        "id": "job-6d1a55",
+        "label": "classify-tags \u2014 TechCorp Q1 Kickoff"
+      },
+      "jobId": "job-6d1a55",
+      "severity": "warning",
+      "summary": "Cancelled classify-tags job at 47% (cost overrun guard)",
+      "payload": {
+        "before": {
+          "status": "running",
+          "progress": 0.47,
+          "tokensUsed": 184320,
+          "estimatedTokens": 240000,
+          "estimatedUsd": 1.62
+        },
+        "after": {
+          "status": "cancelled",
+          "cancelledAt": "2026-04-24T19:14:20Z",
+          "actualUsd": 0.84,
+          "checkpointsWritten": 67,
+          "resumeFromCheckpoint": "ckpt-067"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-24-0084",
+      "timestamp": "2026-04-24T18:42:00Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "job.start",
+      "target": {
+        "kind": "job",
+        "id": "job-6d1a55",
+        "label": "classify-tags \u2014 TechCorp Q1 Kickoff"
+      },
+      "jobId": "job-6d1a55",
+      "severity": "info",
+      "summary": "Started classify-tags job (estimated $1.62, 240k tokens)",
+      "payload": {
+        "before": null,
+        "after": {
+          "stepId": "classify-tags",
+          "eventId": "evt-002",
+          "model": "claude-sonnet-4",
+          "estimatedUsd": 1.62,
+          "estimatedTokens": 240000,
+          "promptCachingEnabled": true
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-24-0083",
+      "timestamp": "2026-04-24T17:08:55Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Marcus L."
+      },
+      "action": "review.approve",
+      "target": {
+        "kind": "event",
+        "id": "evt-002",
+        "label": "TechCorp Q1 Kickoff"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Approved review for 14 low-confidence tracks",
+      "payload": {
+        "before": {
+          "pendingReviewCount": 14
+        },
+        "after": {
+          "pendingReviewCount": 0,
+          "approvedBy": "marcus.l",
+          "rebucketedCount": 9,
+          "approvedAsIsCount": 5
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-24-0082",
+      "timestamp": "2026-04-24T15:40:11Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "settings.fs-root.update",
+      "target": {
+        "kind": "settings",
+        "id": "fs-root-library",
+        "label": "Master library root"
+      },
+      "jobId": null,
+      "severity": "warning",
+      "summary": "Changed master library root path",
+      "payload": {
+        "before": {
+          "path": "/Volumes/Music-Old/library",
+          "available": false,
+          "freeBytes": null
+        },
+        "after": {
+          "path": "/Volumes/Music/library",
+          "available": true,
+          "freeBytes": 1099511627776,
+          "verifiedAt": "2026-04-24T15:40:11Z"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-24-0081",
+      "timestamp": "2026-04-24T14:22:08Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "job.complete",
+      "target": {
+        "kind": "job",
+        "id": "job-5c0e22",
+        "label": "build-event \u2014 TechCorp Q1 Kickoff"
+      },
+      "jobId": "job-5c0e22",
+      "severity": "info",
+      "summary": "Built event folder with 98 tracks (12 added, 4 removed)",
+      "payload": {
+        "before": {
+          "status": "running",
+          "progress": 0.95
+        },
+        "after": {
+          "status": "succeeded",
+          "outputPath": "/Volumes/Music/events/2026-04-techcorp-q1-kickoff",
+          "filesAdded": 12,
+          "filesRemoved": 4,
+          "filesUnchanged": 82,
+          "durationMs": 142800
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-24-0080",
+      "timestamp": "2026-04-24T13:14:50Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "settings.bucket.add",
+      "target": {
+        "kind": "settings",
+        "id": "genre-buckets",
+        "label": "Genre buckets"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Added new genre bucket: Afrobeats",
+      "payload": {
+        "before": {
+          "bucketCount": 17
+        },
+        "after": {
+          "bucketCount": 18,
+          "addedBucket": {
+            "id": "bucket-afrobeats",
+            "name": "Afrobeats",
+            "fallback": false,
+            "position": 12
+          }
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-23-0078",
+      "timestamp": "2026-04-23T19:55:33Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "build.stale-detected",
+      "target": {
+        "kind": "library",
+        "id": "master",
+        "label": "Master Library"
+      },
+      "jobId": null,
+      "severity": "warning",
+      "summary": "Master library build marked stale (4 tracks promoted since last build)",
+      "payload": {
+        "before": {
+          "buildStatus": "fresh",
+          "lastBuiltAt": "2026-04-21T11:08:00Z",
+          "trackCount": 338
+        },
+        "after": {
+          "buildStatus": "stale",
+          "reason": "tracks-changed",
+          "addedSinceBuild": 4,
+          "removedSinceBuild": 0
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-23-0077",
+      "timestamp": "2026-04-23T18:42:00Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.promote",
+      "target": {
+        "kind": "track",
+        "id": "trk-0001",
+        "label": "\u00d6wnboss & Sevek \u2014 Move Your Body"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Promoted track to Master Library",
+      "payload": {
+        "before": {
+          "promotedToLibrary": false
+        },
+        "after": {
+          "promotedToLibrary": true,
+          "origin": "promoted",
+          "sourceEventId": "evt-001"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-23-0076",
+      "timestamp": "2026-04-23T17:30:14Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "job.fail",
+      "target": {
+        "kind": "job",
+        "id": "job-4b9d77",
+        "label": "match \u2014 Anna 30th Birthday"
+      },
+      "jobId": "job-4b9d77",
+      "severity": "error",
+      "summary": "Match job failed: NAS unreachable",
+      "payload": {
+        "before": {
+          "status": "running",
+          "progress": 0.31
+        },
+        "after": {
+          "status": "failed",
+          "errorCode": "FS_UNREACHABLE",
+          "errorMessage": "Could not reach /Volumes/Music \u2014 check NAS connectivity",
+          "checkpointsWritten": 38,
+          "resumeFromCheckpoint": "ckpt-038"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-23-0075",
+      "timestamp": "2026-04-23T17:14:08Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "job.start",
+      "target": {
+        "kind": "job",
+        "id": "job-4b9d77",
+        "label": "match \u2014 Anna 30th Birthday"
+      },
+      "jobId": "job-4b9d77",
+      "severity": "info",
+      "summary": "Started match job for Anna 30th Birthday",
+      "payload": {
+        "before": null,
+        "after": {
+          "stepId": "match",
+          "eventId": "evt-003",
+          "trackCount": 124,
+          "classification": "heavy"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-23-0074",
+      "timestamp": "2026-04-23T16:02:45Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Marcus L."
+      },
+      "action": "library.demote",
+      "target": {
+        "kind": "track",
+        "id": "trk-0144",
+        "label": "Some One-Hit Wonder \u2014 That Song"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Demoted track from Master Library",
+      "payload": {
+        "before": {
+          "promotedToLibrary": true,
+          "origin": "promoted",
+          "timesUsed": 1
+        },
+        "after": {
+          "promotedToLibrary": false,
+          "demotedReason": "single-use"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-22-0072",
+      "timestamp": "2026-04-22T14:33:21Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "job.complete",
+      "target": {
+        "kind": "job",
+        "id": "job-3a8e44",
+        "label": "apply-tags \u2014 TechCorp Q1 Kickoff"
+      },
+      "jobId": "job-3a8e44",
+      "severity": "info",
+      "summary": "Applied tags to 98 files (98 backups created)",
+      "payload": {
+        "before": {
+          "status": "running",
+          "progress": 0.99
+        },
+        "after": {
+          "status": "succeeded",
+          "filesTagged": 98,
+          "backupsCreated": 98,
+          "backupSizeBytes": 6442450944,
+          "durationMs": 318400
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-22-0071",
+      "timestamp": "2026-04-22T11:08:09Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.add",
+      "target": {
+        "kind": "track",
+        "id": "trk-0046",
+        "label": "Marconi Union \u2014 Weightless"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Added track to Master Library (manual upload)",
+      "payload": {
+        "before": null,
+        "after": {
+          "title": "Weightless",
+          "artist": "Marconi Union",
+          "bucketId": "bucket-downtempo",
+          "filePath": "/Volumes/Music/library/downtempo/Marconi Union - Weightless.flac",
+          "fileSizeBytes": 121345600,
+          "format": "FLAC",
+          "origin": "manual",
+          "addedVia": "drag-and-drop"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-21-0068",
+      "timestamp": "2026-04-21T20:15:42Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "review.rebucket",
+      "target": {
+        "kind": "track",
+        "id": "trk-0099",
+        "label": "FKA twigs \u2014 Two Weeks"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Re-bucketed track from R&B \u2192 Indie",
+      "payload": {
+        "before": {
+          "bucketId": "bucket-rnb",
+          "bucketName": "R&B",
+          "confidence": 0.51
+        },
+        "after": {
+          "bucketId": "bucket-indie",
+          "bucketName": "Indie",
+          "confidence": null,
+          "reviewedBy": "tim.s"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-21-0067",
+      "timestamp": "2026-04-21T19:42:11Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "tags.undo",
+      "target": {
+        "kind": "event",
+        "id": "evt-003",
+        "label": "Anna 30th Birthday"
+      },
+      "jobId": "job-2c7d33",
+      "severity": "warning",
+      "summary": "Undid apply-tags for 116 files (restored from backups)",
+      "payload": {
+        "before": {
+          "filesTagged": 116,
+          "backupsAvailable": 116
+        },
+        "after": {
+          "filesRestored": 116,
+          "backupsConsumed": 116,
+          "backupsRemoved": 116,
+          "durationMs": 87200
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-20-0061",
+      "timestamp": "2026-04-20T11:22:55Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.add",
+      "target": {
+        "kind": "track",
+        "id": "trk-0045",
+        "label": "Sweet Female Attitude \u2014 Flowers"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Added track to Master Library (manual upload)",
+      "payload": {
+        "before": null,
+        "after": {
+          "title": "Flowers",
+          "artist": "Sweet Female Attitude",
+          "bucketId": "bucket-uk-garage",
+          "filePath": "/Volumes/Music/library/uk-garage/Sweet Female Attitude - Flowers.flac",
+          "format": "FLAC",
+          "origin": "manual"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-18-0055",
+      "timestamp": "2026-04-18T22:04:18Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Marcus L."
+      },
+      "action": "library.promote",
+      "target": {
+        "kind": "track",
+        "id": "trk-0017",
+        "label": "Beyonc\u00e9 \u2014 Crazy In Love (feat. JAY-Z)"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Promoted track to Master Library",
+      "payload": {
+        "before": {
+          "promotedToLibrary": false
+        },
+        "after": {
+          "promotedToLibrary": true,
+          "origin": "promoted",
+          "sourceEventId": "evt-005"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-18-0054",
+      "timestamp": "2026-04-18T18:30:07Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "settings.bearer-token.rotate",
+      "target": {
+        "kind": "settings",
+        "id": "bearer-token",
+        "label": "API bearer token"
+      },
+      "jobId": null,
+      "severity": "warning",
+      "summary": "Rotated API bearer token",
+      "payload": {
+        "before": {
+          "tokenId": "tok-***a72c",
+          "issuedAt": "2025-08-14T10:00:00Z",
+          "lastUsedAt": "2026-04-18T18:25:00Z"
+        },
+        "after": {
+          "tokenId": "tok-***f93e",
+          "issuedAt": "2026-04-18T18:30:07Z",
+          "expiresAt": "2027-04-18T18:30:07Z"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-17-0050",
+      "timestamp": "2026-04-17T13:27:44Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "gate.override",
+      "target": {
+        "kind": "library",
+        "id": "master",
+        "label": "Master Library"
+      },
+      "jobId": null,
+      "severity": "override",
+      "summary": "Overrode storage warning to build master library",
+      "payload": {
+        "before": {
+          "freeBytes": 53687091200,
+          "freeBytesThreshold": 107374182400,
+          "blocked": true
+        },
+        "after": {
+          "freeBytes": 53687091200,
+          "blocked": false,
+          "overriddenBy": "tim.s"
+        }
+      },
+      "overrideReason": "Aware drive is below 100GB threshold. Cleaned old event folders yesterday and ordering replacement drive arrives Monday."
+    },
+    {
+      "id": "audit-2026-04-15-0044",
+      "timestamp": "2026-04-15T16:50:12Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "job.complete",
+      "target": {
+        "kind": "job",
+        "id": "job-0e4a99",
+        "label": "build-library \u2014 Master Library"
+      },
+      "jobId": "job-0e4a99",
+      "severity": "info",
+      "summary": "Built master library (338 tracks, 23.6 GB)",
+      "payload": {
+        "before": {
+          "status": "running",
+          "progress": 0.97
+        },
+        "after": {
+          "status": "succeeded",
+          "trackCount": 338,
+          "totalBytes": 25341538304,
+          "durationMs": 482900,
+          "outputPath": "/Volumes/Music/library"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-15-0043",
+      "timestamp": "2026-04-15T16:42:01Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.add",
+      "target": {
+        "kind": "track",
+        "id": "trk-0046b",
+        "label": "Marconi Union \u2014 Weightless (alt extended cut)"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Added track to Master Library (manual upload)",
+      "payload": {
+        "before": null,
+        "after": {
+          "title": "Weightless (alt extended cut)",
+          "artist": "Marconi Union",
+          "bucketId": "bucket-downtempo",
+          "filePath": "/Volumes/Music/library/downtempo/Marconi Union - Weightless (alt extended cut).flac",
+          "format": "FLAC"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-12-0036",
+      "timestamp": "2026-04-12T19:18:40Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Marcus L."
+      },
+      "action": "review.rebucket",
+      "target": {
+        "kind": "track",
+        "id": "trk-0037",
+        "label": "The Klezmer Conservatory Band \u2014 Hava Nagila"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Re-bucketed track from Misc \u2192 World",
+      "payload": {
+        "before": {
+          "bucketId": "bucket-misc",
+          "bucketName": "Misc",
+          "confidence": 0.22
+        },
+        "after": {
+          "bucketId": "bucket-world",
+          "bucketName": "World",
+          "confidence": null,
+          "reviewedBy": "marcus.l"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-10-0029",
+      "timestamp": "2026-04-10T08:45:22Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "job.fail",
+      "target": {
+        "kind": "job",
+        "id": "job-9b2c11",
+        "label": "fetch \u2014 Hannah Bat Mitzvah"
+      },
+      "jobId": "job-9b2c11",
+      "severity": "error",
+      "summary": "Spotify fetch failed: rate limit exceeded",
+      "payload": {
+        "before": {
+          "status": "running",
+          "progress": 0.12
+        },
+        "after": {
+          "status": "failed",
+          "errorCode": "SPOTIFY_RATE_LIMIT",
+          "httpStatus": 429,
+          "retryAfterSeconds": 1800
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-08-0021",
+      "timestamp": "2026-04-08T14:08:15Z",
+      "actor": {
+        "kind": "system",
+        "name": "system"
+      },
+      "action": "settings.spotify.relink",
+      "target": {
+        "kind": "settings",
+        "id": "spotify-auth",
+        "label": "Spotify integration"
+      },
+      "jobId": null,
+      "severity": "warning",
+      "summary": "Spotify token re-linked after expiry",
+      "payload": {
+        "before": {
+          "status": "expired",
+          "lastRefreshedAt": "2025-12-08T14:08:00Z"
+        },
+        "after": {
+          "status": "linked",
+          "linkedAccount": "tim.dj@example.com",
+          "scopes": [
+            "playlist-read-private",
+            "playlist-modify-private",
+            "user-library-read"
+          ],
+          "lastRefreshedAt": "2026-04-08T14:08:15Z"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-04-03-0014",
+      "timestamp": "2026-04-03T11:08:33Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.promote",
+      "target": {
+        "kind": "track",
+        "id": "trk-0044",
+        "label": "Pendulum feat. $pyda, Tenor Fly & Fresh \u2014 Tarantula"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Promoted track to Master Library",
+      "payload": {
+        "before": {
+          "promotedToLibrary": false
+        },
+        "after": {
+          "promotedToLibrary": true,
+          "origin": "promoted",
+          "sourceEventId": "evt-006"
+        }
+      },
+      "overrideReason": null
+    },
+    {
+      "id": "audit-2026-03-28-0008",
+      "timestamp": "2026-03-28T11:22:48Z",
+      "actor": {
+        "kind": "operator",
+        "name": "Tim S."
+      },
+      "action": "library.promote",
+      "target": {
+        "kind": "track",
+        "id": "trk-0050",
+        "label": "DJ Fresh \u2014 Gold Dust (Flava D Bootleg)"
+      },
+      "jobId": null,
+      "severity": "info",
+      "summary": "Promoted track to Master Library",
+      "payload": {
+        "before": {
+          "promotedToLibrary": false
+        },
+        "after": {
+          "promotedToLibrary": true,
+          "origin": "promoted",
+          "sourceEventId": "evt-003"
+        }
+      },
+      "overrideReason": null
+    }
+  ],
+  "filterOptions": {
+    "actions": [
+      {
+        "id": "job.start",
+        "namespace": "job",
+        "label": "Start",
+        "count": 287
+      },
+      {
+        "id": "job.complete",
+        "namespace": "job",
+        "label": "Complete",
+        "count": 264
+      },
+      {
+        "id": "job.fail",
+        "namespace": "job",
+        "label": "Fail",
+        "count": 18
+      },
+      {
+        "id": "job.cancel",
+        "namespace": "job",
+        "label": "Cancel",
+        "count": 7
+      },
+      {
+        "id": "job.checkpoint.fail",
+        "namespace": "job",
+        "label": "Checkpoint fail",
+        "count": 12
+      },
+      {
+        "id": "review.rebucket",
+        "namespace": "review",
+        "label": "Re-bucket",
+        "count": 142
+      },
+      {
+        "id": "review.approve",
+        "namespace": "review",
+        "label": "Approve",
+        "count": 28
+      },
+      {
+        "id": "library.promote",
+        "namespace": "library",
+        "label": "Promote",
+        "count": 156
+      },
+      {
+        "id": "library.demote",
+        "namespace": "library",
+        "label": "Demote",
+        "count": 23
+      },
+      {
+        "id": "library.add",
+        "namespace": "library",
+        "label": "Add",
+        "count": 47
+      },
+      {
+        "id": "library.remove",
+        "namespace": "library",
+        "label": "Remove",
+        "count": 14
+      },
+      {
+        "id": "library.import-spotify",
+        "namespace": "library",
+        "label": "Import from Spotify",
+        "count": 31
+      },
+      {
+        "id": "settings.api-key.update",
+        "namespace": "settings",
+        "label": "API key update",
+        "count": 6
+      },
+      {
+        "id": "settings.bucket.add",
+        "namespace": "settings",
+        "label": "Add bucket",
+        "count": 4
+      },
+      {
+        "id": "settings.bucket.reorder",
+        "namespace": "settings",
+        "label": "Reorder buckets",
+        "count": 11
+      },
+      {
+        "id": "settings.fs-root.update",
+        "namespace": "settings",
+        "label": "Filesystem root update",
+        "count": 3
+      },
+      {
+        "id": "settings.bearer-token.rotate",
+        "namespace": "settings",
+        "label": "Rotate bearer token",
+        "count": 2
+      },
+      {
+        "id": "settings.spotify.relink",
+        "namespace": "settings",
+        "label": "Spotify re-link",
+        "count": 5
+      },
+      {
+        "id": "gate.override",
+        "namespace": "gate",
+        "label": "Override quality gate",
+        "count": 9
+      },
+      {
+        "id": "tags.undo",
+        "namespace": "tags",
+        "label": "Undo tags",
+        "count": 5
+      },
+      {
+        "id": "build.stale-detected",
+        "namespace": "build",
+        "label": "Build stale detected",
+        "count": 18
+      }
+    ],
+    "actors": [
+      {
+        "id": "tim.s",
+        "kind": "operator",
+        "name": "Tim S.",
+        "count": 482
+      },
+      {
+        "id": "marcus.l",
+        "kind": "operator",
+        "name": "Marcus L.",
+        "count": 198
+      },
+      {
+        "id": "system",
+        "kind": "system",
+        "name": "system",
+        "count": 568
+      }
+    ],
+    "targetKinds": [
+      "event",
+      "track",
+      "library",
+      "settings",
+      "job"
+    ],
+    "severities": [
+      "info",
+      "warning",
+      "error",
+      "override"
+    ]
+  }
+}

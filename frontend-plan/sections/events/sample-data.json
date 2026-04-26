@@ -1,0 +1,187 @@
+{
+  "_meta": {
+    "models": {
+      "events": "Each event represents a single gig (wedding, party) being prepared, with its current progress through the 11-step pipeline, track counts, the active job (if any), and warnings like stale builds."
+    },
+    "relationships": [
+      "Each Event has its own slug, source Spotify playlist URL, and on-disk output folder",
+      "Each Event tracks its position in the 11-step pipeline via currentStepIndex",
+      "Each Event optionally has one activeJob describing what's currently running, queued, or recently failed",
+      "Track counts (total / matched / tagged) summarize the EventTracks belonging to the event"
+    ]
+  },
+  "events": [
+    {
+      "id": "evt-01",
+      "name": "Sarah & Mike's Wedding",
+      "slug": "sarah-mike-wedding",
+      "eventDate": "2026-05-09",
+      "playlistUrl": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+      "currentStepIndex": 6,
+      "currentStepLabel": "Analyze Mood",
+      "totalSteps": 11,
+      "trackCounts": {
+        "total": 124,
+        "matched": 118,
+        "tagged": 0
+      },
+      "activeJob": {
+        "id": "job-9281",
+        "status": "running",
+        "label": "analyze-mood",
+        "progress": 0.42
+      },
+      "isStale": false,
+      "lastActivityAt": "2026-04-24T13:47:00Z"
+    },
+    {
+      "id": "evt-02",
+      "name": "Friday Night Cocktail Hour",
+      "slug": "friday-cocktail",
+      "eventDate": "2026-04-25",
+      "playlistUrl": "https://open.spotify.com/playlist/2fmTTbBkXi8pewbUvG3CeZ",
+      "currentStepIndex": 10,
+      "currentStepLabel": "Build Library",
+      "totalSteps": 11,
+      "trackCounts": {
+        "total": 64,
+        "matched": 64,
+        "tagged": 64
+      },
+      "activeJob": null,
+      "isStale": false,
+      "lastActivityAt": "2026-04-23T18:12:00Z"
+    },
+    {
+      "id": "evt-03",
+      "name": "Acme Corp Holiday Party",
+      "slug": "acme-holiday",
+      "eventDate": "2026-12-12",
+      "playlistUrl": "https://open.spotify.com/playlist/37i9dQZF1DX4SBhb3fqCJd",
+      "currentStepIndex": 7,
+      "currentStepLabel": "Classify Tags",
+      "totalSteps": 11,
+      "trackCounts": {
+        "total": 87,
+        "matched": 84,
+        "tagged": 32
+      },
+      "activeJob": {
+        "id": "job-9272",
+        "status": "failed",
+        "label": "classify-tags",
+        "progress": 0.37,
+        "errorMessage": "Anthropic API rate limit hit \u2014 resume from last batch"
+      },
+      "isStale": false,
+      "lastActivityAt": "2026-04-24T11:02:00Z"
+    },
+    {
+      "id": "evt-04",
+      "name": "Erin & Jamal Renewal of Vows at the Lighthouse",
+      "slug": "erin-jamal-renewal",
+      "eventDate": "2026-06-21",
+      "playlistUrl": "https://open.spotify.com/playlist/0wWqIJlbqjkjqcUw6gP3kP",
+      "currentStepIndex": 9,
+      "currentStepLabel": "Apply Tags",
+      "totalSteps": 11,
+      "trackCounts": {
+        "total": 156,
+        "matched": 149,
+        "tagged": 149
+      },
+      "activeJob": null,
+      "isStale": true,
+      "lastActivityAt": "2026-04-22T09:33:00Z"
+    },
+    {
+      "id": "evt-05",
+      "name": "Beach House Sunset Set",
+      "slug": "beach-house-sunset",
+      "eventDate": "2026-07-04",
+      "playlistUrl": "https://open.spotify.com/playlist/37i9dQZF1DX8tZsk68tuDw",
+      "currentStepIndex": 0,
+      "currentStepLabel": "Fetch",
+      "totalSteps": 11,
+      "trackCounts": {
+        "total": 42,
+        "matched": 0,
+        "tagged": 0
+      },
+      "activeJob": null,
+      "isStale": false,
+      "lastActivityAt": "2026-04-24T08:15:00Z"
+    },
+    {
+      "id": "evt-06",
+      "name": "Linnea & Per Reception",
+      "slug": "linnea-per-reception",
+      "eventDate": "2026-05-30",
+      "playlistUrl": "https://open.spotify.com/playlist/4LdyPjEAyc8x5PBwrJQ8XQ",
+      "currentStepIndex": 6,
+      "currentStepLabel": "Analyze Mood",
+      "totalSteps": 11,
+      "trackCounts": {
+        "total": 98,
+        "matched": 95,
+        "tagged": 0
+      },
+      "activeJob": {
+        "id": "job-9285",
+        "status": "queued",
+        "label": "analyze-mood",
+        "progress": null,
+        "queuePosition": 1
+      },
+      "isStale": false,
+      "lastActivityAt": "2026-04-24T13:51:00Z"
+    },
+    {
+      "id": "evt-07",
+      "name": "Late Night Warehouse",
+      "slug": "warehouse-late-night",
+      "eventDate": "2026-05-17",
+      "playlistUrl": "https://open.spotify.com/playlist/37i9dQZF1DX4dyzvuaRJ0n",
+      "currentStepIndex": 10,
+      "currentStepLabel": "Build Event",
+      "totalSteps": 11,
+      "trackCounts": {
+        "total": 73,
+        "matched": 71,
+        "tagged": 71
+      },
+      "activeJob": {
+        "id": "job-9279",
+        "status": "running",
+        "label": "build-event",
+        "progress": 0.81
+      },
+      "isStale": false,
+      "lastActivityAt": "2026-04-24T13:55:00Z"
+    },
+    {
+      "id": "evt-08",
+      "name": "Studio B Test Run",
+      "slug": "studio-b-test",
+      "eventDate": "2026-04-28",
+      "playlistUrl": "https://open.spotify.com/playlist/3a6XO4DJtWMuJB0d4u9qRq",
+      "currentStepIndex": 8,
+      "currentStepLabel": "Apply Tags",
+      "totalSteps": 11,
+      "trackCounts": {
+        "total": 18,
+        "matched": 18,
+        "tagged": 18
+      },
+      "activeJob": {
+        "id": "job-9268",
+        "status": "failed",
+        "label": "apply-tags",
+        "progress": 0.55,
+        "errorMessage": "Quality gate failed: 3 tracks have unresolved bucket conflicts"
+      },
+      "isStale": false,
+      "lastActivityAt": "2026-04-23T22:04:00Z"
+    }
+  ]
+}

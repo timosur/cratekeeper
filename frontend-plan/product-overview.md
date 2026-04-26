@@ -34,3 +34,18 @@ It runs entirely against a local music NAS, with explicit checkpoints, undo for 
 - **Build** — a materialized folder output (per-event folder or the Master Library).
 - **AuditEntry** — append-only record of any state-changing action.
 - **Setting** — stored configuration value (credentials, paths, bearer token, bucket order, model + caching toggle).
+
+## Implementation sequence (milestones)
+The handoff package is structured to be implemented in this order. Each milestone is a self-contained instruction file in [instructions/incremental/](instructions/incremental/).
+
+1. **Shell** — Design tokens + the persistent left sidebar shell that wraps every section.
+2. **Events** — The dashboard card grid; the primary entry point.
+3. **Event Detail** — The 11-step pipeline working surface.
+4. **Master Library** — Curated collection browse / add / verify.
+5. **Settings** — Integrations, filesystem roots, genre buckets, API access.
+6. **Audit Log** — Filterable append-only timeline.
+
+## What this handoff is — and isn't
+**Is:** finished UI designs (props-based React + Tailwind components), product requirements, user flows, design tokens, sample data, and UI test specs.
+
+**Isn't:** backend architecture, persistence model, business-logic implementation, or infrastructure choices. Those are decisions for the implementer.

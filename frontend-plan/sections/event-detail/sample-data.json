@@ -1,0 +1,325 @@
+{
+  "_meta": {
+    "models": {
+      "event": "The single event being worked on. Holds the event header (name, date, slug, playlist), top-level health banners (quality gate, stale builds, missing masterpieces) and quick stats (Total / Matched / From Library / Tagged), the 11-step pipeline rail with per-step status and summaries, plus inline detail data for the active step.",
+      "steps": "The 11 ordered pipeline steps grouped into phases (Intake, Classify, Library, Analysis, Tagging, Build). Each carries its current status, last run timestamp, and a one-line summary.",
+      "qualityGate": "The pre-flight Quality Checks result. Surfaces failing checks that block destructive steps until reviewed or overridden.",
+      "staleBuilds": "Downstream folder builds that have gone out of date because tags or matches changed. Lists which build needs rebuilding.",
+      "missingMasterpieces": "Matched tracks in this event that resolve to a curated Master Library entry whose file is currently missing on disk. Surfaced as a banner that gates destructive Build steps until repaired.",
+      "recentActivity": "The last few audit-log entries scoped to this event, shown in the panel footer.",
+      "details": "Per-step detail datasets used by individual step panels: classify distribution, review queue, match results (with per-row source pill and promote-star state), analyze rows, tag-cost estimate, plus the live job log."
+    },
+    "relationships": [
+      "Each Event contains exactly 11 ordered Steps belonging to one of 6 Phases",
+      "The currently running Job (when present) belongs to the active Step and produces live SSE log lines",
+      "Quality Gate failures gate every destructive step (Apply Tags, Build Event, Build Library) until cleared or overridden",
+      "Stale Builds are a consequence of a successful Apply Tags after a previous Build",
+      "Each Matched Track resolves from either the Master Library pool (source=library) or the broader NAS Library pool (source=nas); the Master Library always wins when both pools have the same ISRC",
+      "Missing Masterpieces are matched tracks where isPromoted=true but the libraryFilePresence is missing; their count drives the top-level banner",
+      "Recent Activity entries are AuditEntries scoped to this Event, ordered newest-first"
+    ]
+  },
+  "event": {
+    "id": "evt-01",
+    "name": "Sarah & Mike's Wedding",
+    "slug": "sarah-mike-wedding",
+    "eventDate": "2026-05-09",
+    "playlistUrl": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+    "trackCounts": {
+      "total": 124,
+      "matched": 118,
+      "fromLibrary": 89,
+      "tagged": 0
+    },
+    "qualityGate": {
+      "status": "warning",
+      "failingCount": 0,
+      "warningCount": 2,
+      "lastCheckedAt": "2026-04-24T13:42:00Z"
+    },
+    "staleBuilds": [],
+    "missingMasterpieces": {
+      "count": 2,
+      "trackIds": ["trk-0003", "trk-0007"]
+    },
+    "activeStepId": "analyze-mood",
+    "steps": [
+      {
+        "id": "fetch",
+        "phase": "Intake",
+        "index": 1,
+        "label": "Fetch",
+        "description": "Pull the Spotify playlist into local JSON.",
+        "status": "succeeded",
+        "lastRunAt": "2026-04-23T09:14:00Z",
+        "lastRunDurationMs": 4200,
+        "summary": "124 tracks fetched"
+      },
+      {
+        "id": "enrich",
+        "phase": "Intake",
+        "index": 2,
+        "label": "Enrich",
+        "description": "MusicBrainz genre and year fill-in (rate-limited).",
+        "status": "succeeded",
+        "lastRunAt": "2026-04-23T09:18:00Z",
+        "lastRunDurationMs": 168000,
+        "summary": "121 enriched, 3 unmatched"
+      },
+      {
+        "id": "classify",
+        "phase": "Classify",
+        "index": 3,
+        "label": "Classify",
+        "description": "Rule-based assignment into 18 genre buckets.",
+        "status": "succeeded",
+        "lastRunAt": "2026-04-23T09:21:00Z",
+        "lastRunDurationMs": 1800,
+        "summary": "16 buckets used"
+      },
+      {
+        "id": "review",
+        "phase": "Classify",
+        "index": 4,
+        "label": "Review",
+        "description": "Surface low-confidence classifications for bulk re-bucketing.",
+        "status": "succeeded",
+        "lastRunAt": "2026-04-23T11:02:00Z",
+        "lastRunDurationMs": null,
+        "summary": "8 re-bucketed manually"
+      },
+      {
+        "id": "scan",
+        "phase": "Library",
+        "index": 5,
+        "label": "Scan",
+        "description": "Index the local NAS into Postgres.",
+        "status": "succeeded",
+        "lastRunAt": "2026-04-23T11:30:00Z",
+        "lastRunDurationMs": 92000,
+        "summary": "47,218 files indexed"
+      },
+      {
+        "id": "match",
+        "phase": "Library",
+        "index": 6,
+        "label": "Match",
+        "description": "ISRC \u2192 exact \u2192 fuzzy local matching; emit Tidal URLs for misses.",
+        "status": "succeeded",
+        "lastRunAt": "2026-04-23T11:34:00Z",
+        "lastRunDurationMs": 23000,
+        "summary": "118 matched, 6 misses"
+      },
+      {
+        "id": "analyze-mood",
+        "phase": "Analysis",
+        "index": 7,
+        "label": "Analyze Mood",
+        "description": "Essentia + TF analysis: BPM, key, energy, mood, arousal/valence.",
+        "status": "running",
+        "lastRunAt": "2026-04-24T13:30:00Z",
+        "lastRunDurationMs": null,
+        "summary": "47 of 124 analyzed",
+        "activeJob": {
+          "id": "job-9281",
+          "label": "analyze-mood",
+          "status": "running",
+          "progress": 0.379,
+          "processedUnits": 47,
+          "totalUnits": 124,
+          "startedAt": "2026-04-24T13:30:00Z",
+          "elapsedMs": 1140000,
+          "etaSeconds": 1860
+        }
+      },
+      {
+        "id": "classify-tags",
+        "phase": "Analysis",
+        "index": 8,
+        "label": "Classify Tags",
+        "description": "Anthropic Sonnet structured tags (energy, function, crowd, mood).",
+        "status": "idle",
+        "lastRunAt": null,
+        "lastRunDurationMs": null,
+        "summary": "Awaiting mood analysis"
+      },
+      {
+        "id": "apply-tags",
+        "phase": "Tagging",
+        "index": 9,
+        "label": "Apply Tags",
+        "description": "Write ID3/Vorbis/MP4 tags in place. Per-file backup.",
+        "status": "idle",
+        "lastRunAt": null,
+        "lastRunDurationMs": null,
+        "summary": "Awaiting tag classification"
+      },
+      {
+        "id": "build-event",
+        "phase": "Build",
+        "index": 10,
+        "label": "Build Event",
+        "description": "Copy or symlink into Genre/Artist - Title.ext.",
+        "status": "idle",
+        "lastRunAt": null,
+        "lastRunDurationMs": null,
+        "summary": "Awaiting tag write"
+      },
+      {
+        "id": "build-library",
+        "phase": "Build",
+        "index": 11,
+        "label": "Build Library",
+        "description": "Master library accumulator across events.",
+        "status": "idle",
+        "lastRunAt": null,
+        "lastRunDurationMs": null,
+        "summary": "Awaiting event build"
+      }
+    ],
+    "recentActivity": [
+      {
+        "id": "aud-4421",
+        "timestamp": "2026-04-24T13:30:00Z",
+        "actor": "operator",
+        "action": "job.start",
+        "targetKind": "job",
+        "targetId": "job-9281",
+        "summary": "Started analyze-mood for 124 tracks"
+      },
+      {
+        "id": "aud-4419",
+        "timestamp": "2026-04-23T11:34:00Z",
+        "actor": "operator",
+        "action": "match.complete",
+        "targetKind": "step",
+        "targetId": "match",
+        "summary": "Match completed: 118 matched, 6 misses"
+      },
+      {
+        "id": "aud-4417",
+        "timestamp": "2026-04-23T11:02:00Z",
+        "actor": "operator",
+        "action": "review.bulk-rebucket",
+        "targetKind": "step",
+        "targetId": "review",
+        "summary": "Bulk re-bucketed 8 tracks: house \u2192 deep-house"
+      },
+      {
+        "id": "aud-4415",
+        "timestamp": "2026-04-23T09:21:00Z",
+        "actor": "system",
+        "action": "classify.complete",
+        "targetKind": "step",
+        "targetId": "classify",
+        "summary": "Classified 124 tracks across 16 buckets"
+      },
+      {
+        "id": "aud-4412",
+        "timestamp": "2026-04-23T09:14:00Z",
+        "actor": "operator",
+        "action": "event.create",
+        "targetKind": "event",
+        "targetId": "evt-01",
+        "summary": "Event created from Spotify playlist"
+      }
+    ]
+  },
+  "details": {
+    "classifyDistribution": [
+      { "bucket": "Pop", "count": 28 },
+      { "bucket": "Indie", "count": 19 },
+      { "bucket": "Disco", "count": 14 },
+      { "bucket": "Funk & Soul", "count": 13 },
+      { "bucket": "House", "count": 11 },
+      { "bucket": "Hip-Hop", "count": 9 },
+      { "bucket": "R&B", "count": 8 },
+      { "bucket": "Rock", "count": 7 },
+      { "bucket": "Electronic", "count": 6 },
+      { "bucket": "Latin", "count": 4 },
+      { "bucket": "Reggae", "count": 2 },
+      { "bucket": "Other", "count": 3 }
+    ],
+    "reviewTracks": [
+      { "id": "trk-0017", "artist": "Caribou", "title": "Odessa", "currentBucket": "Electronic", "suggestedBucket": "Indie Dance", "confidence": 0.42 },
+      { "id": "trk-0023", "artist": "Khruangbin", "title": "Maria Tambi\u00e9n", "currentBucket": "Other", "suggestedBucket": "Funk & Soul", "confidence": 0.38 },
+      { "id": "trk-0031", "artist": "Bonobo", "title": "Cirrus", "currentBucket": "Electronic", "suggestedBucket": "Downtempo", "confidence": 0.51 },
+      { "id": "trk-0044", "artist": "Glass Animals", "title": "Heat Waves", "currentBucket": "Pop", "suggestedBucket": "Indie", "confidence": 0.49 },
+      { "id": "trk-0058", "artist": "Jungle", "title": "Busy Earnin'", "currentBucket": "Funk & Soul", "suggestedBucket": "Disco", "confidence": 0.55 },
+      { "id": "trk-0067", "artist": "Tame Impala", "title": "The Less I Know the Better", "currentBucket": "Rock", "suggestedBucket": "Indie", "confidence": 0.47 },
+      { "id": "trk-0079", "artist": "Polo & Pan", "title": "Canopee", "currentBucket": "Other", "suggestedBucket": "House", "confidence": 0.36 },
+      { "id": "trk-0085", "artist": "Daft Punk", "title": "Get Lucky", "currentBucket": "Disco", "suggestedBucket": "House", "confidence": 0.58 },
+      { "id": "trk-0091", "artist": "Anderson .Paak", "title": "Come Down", "currentBucket": "Hip-Hop", "suggestedBucket": "Funk & Soul", "confidence": 0.44 },
+      { "id": "trk-0103", "artist": "Parcels", "title": "Tieduprightnow", "currentBucket": "Pop", "suggestedBucket": "Disco", "confidence": 0.39 }
+    ],
+    "matchResults": {
+      "matched": [
+        { "id": "trk-0001", "artist": "Stevie Wonder", "title": "Sir Duke", "isrc": "USMO16800027", "filePath": "/Volumes/Music/Library/Funk/Stevie Wonder - Sir Duke.flac", "matchKind": "isrc", "source": "library", "spotifyUrl": "https://open.spotify.com/track/2WfaOiMkCvy7F5fcp2zZ8L", "tidalUrl": "https://tidal.com/browse/track/77640617", "isPromoted": true, "libraryFilePresence": "present", "libraryPath": "/Volumes/Music/Library/Funk/Stevie Wonder - Sir Duke.flac", "canPromote": true },
+        { "id": "trk-0002", "artist": "Earth, Wind & Fire", "title": "September", "isrc": "USCO27800007", "filePath": "/Volumes/Music/Library/Disco/Earth, Wind & Fire - September.flac", "matchKind": "isrc", "source": "library", "spotifyUrl": "https://open.spotify.com/track/3kxfsdsCpFgN412fpnW85Y", "tidalUrl": "https://tidal.com/browse/track/8551291", "isPromoted": true, "libraryFilePresence": "present", "libraryPath": "/Volumes/Music/Library/Disco/Earth, Wind & Fire - September.flac", "canPromote": true },
+        { "id": "trk-0003", "artist": "Daft Punk", "title": "Get Lucky", "isrc": "GBDUW1300026", "filePath": "/Volumes/Music/NAS/House/Daft Punk - Get Lucky.flac", "matchKind": "isrc", "source": "library", "spotifyUrl": "https://open.spotify.com/track/2Foc5Q5nqNiosCNqttzHof", "tidalUrl": "https://tidal.com/browse/track/22630510", "isPromoted": true, "libraryFilePresence": "missing", "libraryPath": "/Volumes/Music/Library/House/Daft Punk - Get Lucky.flac", "canPromote": true },
+        { "id": "trk-0004", "artist": "Beyonc\u00e9", "title": "Crazy in Love", "isrc": "USSM10309027", "filePath": "/Volumes/Music/Library/Pop/Beyonce - Crazy in Love.m4a", "matchKind": "exact", "source": "library", "spotifyUrl": "https://open.spotify.com/track/5IVuqXILoxVWvWEPm82Jxr", "tidalUrl": "https://tidal.com/browse/track/24037421", "isPromoted": true, "libraryFilePresence": "present", "libraryPath": "/Volumes/Music/Library/Pop/Beyonce - Crazy in Love.m4a", "canPromote": true },
+        { "id": "trk-0005", "artist": "Outkast", "title": "Hey Ya!", "isrc": "USAR10301129", "filePath": "/Volumes/Music/NAS/Hip-Hop/Outkast - Hey Ya.flac", "matchKind": "isrc", "source": "nas", "spotifyUrl": "https://open.spotify.com/track/2PpruBYCo4H7WOBJ7Q2EwM", "tidalUrl": "https://tidal.com/browse/track/3992564", "isPromoted": false, "libraryFilePresence": "n/a", "canPromote": true },
+        { "id": "trk-0006", "artist": "Fleetwood Mac", "title": "Everywhere", "isrc": "USWB18717002", "filePath": "/Volumes/Music/Library/Rock/Fleetwood Mac - Everywhere.flac", "matchKind": "isrc", "source": "library", "spotifyUrl": "https://open.spotify.com/track/4uVa0s9ZJF5Uk0NbrtfQQB", "tidalUrl": "https://tidal.com/browse/track/16860547", "isPromoted": true, "libraryFilePresence": "present", "libraryPath": "/Volumes/Music/Library/Rock/Fleetwood Mac - Everywhere.flac", "canPromote": true },
+        { "id": "trk-0007", "artist": "ABBA", "title": "Dancing Queen", "isrc": "SEAYA7600001", "filePath": "/Volumes/Music/NAS/Pop/ABBA - Dancing Queen.flac", "matchKind": "isrc", "source": "library", "spotifyUrl": "https://open.spotify.com/track/0GjEhVFGZW8afUYGChu3Rr", "tidalUrl": "https://tidal.com/browse/track/35038163", "isPromoted": true, "libraryFilePresence": "missing", "libraryPath": "/Volumes/Music/Library/Pop/ABBA - Dancing Queen.flac", "canPromote": true },
+        { "id": "trk-0008", "artist": "Chic", "title": "Good Times", "isrc": "USAT27900012", "filePath": "/Volumes/Music/NAS/Disco/Chic - Good Times.flac", "matchKind": "isrc", "source": "nas", "spotifyUrl": "https://open.spotify.com/track/3a47qYPmA6BD9IM4FTNCun", "tidalUrl": "https://tidal.com/browse/track/6948719", "isPromoted": false, "libraryFilePresence": "n/a", "canPromote": true },
+        { "id": "trk-0009", "artist": "Whitney Houston", "title": "I Wanna Dance with Somebody", "isrc": "USAR18700084", "filePath": "/Volumes/Music/Library/Pop/Whitney Houston - I Wanna Dance.m4a", "matchKind": "fuzzy", "source": "library", "spotifyUrl": "https://open.spotify.com/track/2tUBqZG2AbRi7Q0BIrVrEj", "tidalUrl": "https://tidal.com/browse/track/2391537", "isPromoted": true, "libraryFilePresence": "present", "libraryPath": "/Volumes/Music/Library/Pop/Whitney Houston - I Wanna Dance.m4a", "canPromote": true },
+        { "id": "trk-0010", "artist": "Prince", "title": "Kiss", "isrc": "USWB10500201", "filePath": "/Volumes/Music/NAS/Funk/Prince - Kiss.flac", "matchKind": "isrc", "source": "nas", "spotifyUrl": "https://open.spotify.com/track/4ucKtCqEoYUVbI3LFXjmfP", "tidalUrl": "https://tidal.com/browse/track/77648014", "isPromoted": false, "libraryFilePresence": "n/a", "canPromote": false }
+      ],
+      "misses": [
+        { "id": "trk-0119", "artist": "Sault", "title": "Free", "isrc": "QZES72093041", "spotifyUrl": "https://open.spotify.com/track/3i6Vj5g4omr9crBblEnEPv", "tidalPurchaseUrl": "https://tidal.com/browse/track/q-search?q=Sault+Free" },
+        { "id": "trk-0120", "artist": "Romy", "title": "Loveher", "isrc": "GBCEN2200345", "spotifyUrl": "https://open.spotify.com/track/3GQRbNVy1xMhEM9YdwXKpz", "tidalPurchaseUrl": "https://tidal.com/browse/track/q-search?q=Romy+Loveher" },
+        { "id": "trk-0121", "artist": "Yaeji", "title": "Raingurl", "isrc": "USA2P1741002", "spotifyUrl": "https://open.spotify.com/track/0Z8rNUVlfTQ08YjU5ldZ4g", "tidalPurchaseUrl": "https://tidal.com/browse/track/q-search?q=Yaeji+Raingurl" },
+        { "id": "trk-0122", "artist": "Overmono", "title": "So U Kno", "isrc": "GBJ9N2100052", "spotifyUrl": "https://open.spotify.com/track/4dbXJWfjkEWSbDuHLgQoJq", "tidalPurchaseUrl": "https://tidal.com/browse/track/q-search?q=Overmono+So+U+Kno" },
+        { "id": "trk-0123", "artist": "DJ Lag", "title": "Ice Drop", "isrc": "GBKPL1900147", "spotifyUrl": "https://open.spotify.com/track/6wTQeINJkOK86mQNtbLfDP", "tidalPurchaseUrl": "https://tidal.com/browse/track/q-search?q=DJ+Lag+Ice+Drop" },
+        { "id": "trk-0124", "artist": "Nia Archives", "title": "Sober Feels", "isrc": "GBCEN2200781", "spotifyUrl": "https://open.spotify.com/track/2GTCh4rJOQUf2VnJN7nhV0", "tidalPurchaseUrl": "https://tidal.com/browse/track/q-search?q=Nia+Archives+Sober+Feels" }
+      ]
+    },
+    "moodAnalysisRows": [
+      { "id": "trk-0001", "artist": "Stevie Wonder", "title": "Sir Duke", "status": "succeeded", "bpm": 122, "key": "B\u266d", "energy": 0.81, "valence": 0.92 },
+      { "id": "trk-0002", "artist": "Earth, Wind & Fire", "title": "September", "status": "succeeded", "bpm": 126, "key": "A", "energy": 0.88, "valence": 0.95 },
+      { "id": "trk-0003", "artist": "Daft Punk", "title": "Get Lucky", "status": "succeeded", "bpm": 116, "key": "B\u266d", "energy": 0.74, "valence": 0.86 },
+      { "id": "trk-0004", "artist": "Beyonc\u00e9", "title": "Crazy in Love", "status": "succeeded", "bpm": 99, "key": "D", "energy": 0.79, "valence": 0.74 },
+      { "id": "trk-0005", "artist": "Outkast", "title": "Hey Ya!", "status": "succeeded", "bpm": 159, "key": "G", "energy": 0.85, "valence": 0.97 },
+      { "id": "trk-0006", "artist": "Fleetwood Mac", "title": "Everywhere", "status": "succeeded", "bpm": 124, "key": "A", "energy": 0.62, "valence": 0.78 },
+      { "id": "trk-0007", "artist": "ABBA", "title": "Dancing Queen", "status": "succeeded", "bpm": 100, "key": "A", "energy": 0.73, "valence": 0.92 },
+      { "id": "trk-0008", "artist": "Chic", "title": "Good Times", "status": "succeeded", "bpm": 112, "key": "E", "energy": 0.69, "valence": 0.81 },
+      { "id": "trk-0009", "artist": "Whitney Houston", "title": "I Wanna Dance with Somebody", "status": "succeeded", "bpm": 119, "key": "G\u266d", "energy": 0.84, "valence": 0.93 },
+      { "id": "trk-0010", "artist": "Prince", "title": "Kiss", "status": "succeeded", "bpm": 113, "key": "A", "energy": 0.71, "valence": 0.82 },
+      { "id": "trk-0046", "artist": "Khruangbin", "title": "Maria Tambi\u00e9n", "status": "succeeded", "bpm": 95, "key": "F", "energy": 0.42, "valence": 0.61 },
+      { "id": "trk-0047", "artist": "Bonobo", "title": "Cirrus", "status": "running", "bpm": null, "key": null, "energy": null, "valence": null },
+      { "id": "trk-0048", "artist": "Caribou", "title": "Odessa", "status": "queued", "bpm": null, "key": null, "energy": null, "valence": null },
+      { "id": "trk-0049", "artist": "Tame Impala", "title": "The Less I Know the Better", "status": "queued", "bpm": null, "key": null, "energy": null, "valence": null },
+      { "id": "trk-0033", "artist": "Glass Animals", "title": "Heat Waves", "status": "failed", "bpm": null, "key": null, "energy": null, "valence": null, "errorMessage": "Codec read error \u2014 retry available" }
+    ],
+    "tagCostEstimate": {
+      "model": "claude-sonnet-4",
+      "tracks": 124,
+      "estimatedInputTokens": 248000,
+      "estimatedOutputTokens": 31000,
+      "estimatedUsd": 1.42,
+      "promptCachingEnabled": true,
+      "estimatedAt": "2026-04-24T13:25:00Z"
+    },
+    "jobLogLines": [
+      { "ts": "2026-04-24T13:30:00Z", "level": "info", "message": "Job analyze-mood started for evt-01 (124 units)" },
+      { "ts": "2026-04-24T13:30:01Z", "level": "info", "message": "Acquired heavy semaphore (1/1)" },
+      { "ts": "2026-04-24T13:30:02Z", "level": "debug", "message": "Loaded Essentia models: musicnn, mood_aggressive, mood_happy, mood_relaxed" },
+      { "ts": "2026-04-24T13:31:14Z", "level": "info", "message": "Checkpoint: 12/124 (Stevie Wonder \u2014 Sir Duke)" },
+      { "ts": "2026-04-24T13:35:02Z", "level": "info", "message": "Checkpoint: 24/124 (Beyonc\u00e9 \u2014 Crazy in Love)" },
+      { "ts": "2026-04-24T13:38:47Z", "level": "warn", "message": "Codec read error on trk-0033 (Glass Animals \u2014 Heat Waves) \u2014 marked failed, continuing" },
+      { "ts": "2026-04-24T13:41:12Z", "level": "info", "message": "Checkpoint: 36/124 (Outkast \u2014 Hey Ya!)" },
+      { "ts": "2026-04-24T13:44:30Z", "level": "info", "message": "Checkpoint: 47/124 (Khruangbin \u2014 Maria Tambi\u00e9n)" },
+      { "ts": "2026-04-24T13:46:18Z", "level": "debug", "message": "Analyzing trk-0047 (Bonobo \u2014 Cirrus)" },
+      { "ts": "2026-04-24T13:48:02Z", "level": "info", "message": "Avg analysis time: 24.3s/track" },
+      { "ts": "2026-04-24T13:48:02Z", "level": "info", "message": "ETA: ~31 min remaining" },
+      { "ts": "2026-04-24T13:48:51Z", "level": "metric", "message": "memory.rss=2.1GB cpu=87%" }
+    ],
+    "qualityChecks": [
+      { "id": "qc-isrc-coverage", "label": "ISRC coverage \u2265 95%", "severity": "info", "status": "pass", "detail": "118/124 (95.2%) tracks have ISRCs" },
+      { "id": "qc-bucket-conflicts", "label": "No bucket conflicts", "severity": "warning", "status": "warn", "detail": "2 tracks flagged in Review pending re-bucket" },
+      { "id": "qc-fs-roots", "label": "Filesystem roots reachable", "severity": "error", "status": "pass", "detail": "/Volumes/Music, ~/Music/Library, ~/.cratekeeper all reachable" },
+      { "id": "qc-anthropic-key", "label": "Anthropic API key valid", "severity": "error", "status": "pass", "detail": "Key validated 2 hours ago" },
+      { "id": "qc-disk-space", "label": "Sufficient backup disk space", "severity": "warning", "status": "warn", "detail": "11.2 GB free in ~/.cratekeeper (estimated 0.8 GB needed)" }
+    ]
+  }
+}
