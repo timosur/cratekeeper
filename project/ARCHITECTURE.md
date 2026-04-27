@@ -1,6 +1,6 @@
 # Cratekeeper — Architecture
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-27
 
 ## 1. System Overview
 
@@ -99,10 +99,11 @@ cratekeeper_api/
 │   ├── engine.py      # asyncio queue + semaphores (1 heavy / 4 light)
 │   ├── registry.py    # handler registration
 │   ├── context.py     # per-job context (db session, checkpoint API, SSE emit)
-│   ├── dependencies.py# inter-step prerequisites
+│   ├── dependencies.py# inter-step prerequisites (DAG: "can I run X?")
 │   ├── rate_limit.py  # MusicBrainz pacing
 │   ├── sse.py         # SSE hub with last-event-id replay
 │   └── handlers/      # one module per pipeline step
+├── pipeline.py        # canonical user-visible 11-step ordering ("where is event?")
 ├── integrations/      # Spotify/Tidal/Anthropic adapters (live + mock)
 └── alembic/           # migrations (extend, don't duplicate, the CLI's tracks table)
 ```
@@ -119,6 +120,11 @@ cratekeeper_api/
 **Crash recovery:** per-unit checkpoints in Postgres (per-track for `analyze-mood`, per-batch for `classify-tags`, per-file for `apply-tags`/`build-*`). Resume jumps to the first unprocessed unit.
 
 **Adapters:** `integrations/` holds live and mock implementations of Spotify, Tidal, Anthropic, and MusicBrainz. `CRATEKEEPER_TEST_MODE=true` swaps to mocks at container build time.
+
+**Pipeline ordering (`pipeline.py`):** Two layers serve different questions and must stay in sync.
+
+- `jobs/dependencies.py` — DAG of inter-step prerequisites. Answers *"can I run job X right now?"*. Includes library-scoped jobs (`scan-*`, `build-library`, `sync-*`, `refetch`, `undo-tags`).
+- `pipeline.py` — flat 11-step ordering for the dashboard. Answers *"where is this event in the pipeline?"*. Steps: Fetch · Enrich · Classify · Review · Scan · Match · Analyze · Classify Tags · Apply · Build Event · Build Library. `Review` and `Scan` have `derives_progress=False` (they are gates, not auto-run jobs). `current_step(db, event_id)` returns the highest `derives_progress=True` step with a succeeded `JobRun` for the event, defensively (out-of-order completions still resolve to the highest index).
 
 ### 2.3 `cratekeeper-web/` — React Frontend
 
@@ -142,6 +148,8 @@ Top-level views:
 
 `postgres:16-alpine` defined in [docker-compose.yml](../docker-compose.yml). Single database `djlib`. Schema authority: the API owns all tables (`tracks`, `events`, `event_tracks`, `jobs`, `checkpoints`, `settings`, `audit_log`, `tag_backups`, `playlist_sync_runs`, etc.).
 
+`event_tracks.tagged_at` (nullable `TIMESTAMPTZ`) is set by the `apply-tags` handler when a track's MP3 is successfully written and cleared by `undo-tags`. It is the source of truth for the dashboard's `tagged_count` aggregate.
+
 ## 3. Key Data Flows
 
 ### 3.1 End-to-end pipeline (web app)
@@ -155,15 +163,27 @@ Top-level views:
 
 ### 3.2 Tag write + undo
 
-1. `apply-tags` reads `data/<slug>.tags.json`, backs up each file's bytes to `~/.cratekeeper/tag-backups/<event_id>/<spotify_id>.<ext>`, writes the new tags, records a `tag_backups` row per file.
+1. `apply-tags` reads `data/<slug>.tags.json`, backs up each file's bytes to `~/.cratekeeper/tag-backups/<event_id>/<spotify_id>.<ext>`, writes the new tags, records a `tag_backups` row per file, and stamps `event_tracks.tagged_at = NOW()`.
 2. Downstream `build-event` and `build-library` rows for this event are marked stale.
-3. `undo-tags` reads the backup rows, restores files, consumes the rows on success.
+3. `undo-tags` reads the backup rows, restores files, clears `tagged_at` for the restored rows, and consumes the backup rows on success.
 
 ### 3.3 SSE & Resume
 
 - Each running job emits `progress`, `log`, and `metric` events on its SSE channel.
 - The SSE hub keeps a bounded ring buffer per job; clients reconnect with `Last-Event-ID` to replay.
 - On process restart, jobs in `running` status are eligible for **resume from checkpoint** triggered by the user from the UI.
+
+### 3.4 Aggregated dashboard payload
+
+`GET /api/v1/events` and `GET /api/v1/events/{id}` return an enriched `EventOut` for the dashboard (CRATE-1). On top of the basic event fields each row carries:
+
+- `matched_count`, `tagged_count` \u2014 derived from `event_tracks` (`match_status` and `tagged_at`).
+- `current_step_index`, `current_step_label`, `total_steps` \u2014 from `pipeline.current_step(...)`.
+- `is_stale` \u2014 true if any `event_builds` row for the event has `is_stale=true`.
+- `last_activity_at` \u2014 max of latest `JobRun` activity and latest `EventTrack` mutation.
+- `active_job` \u2014 the most relevant `JobRun` for the dashboard (priority running > queued > failed; cancelled is excluded). When the active job is `queued`, `active_job.queue_position` is its 1-based rank within its slot class (heavy vs light per type) computed from `created_at`.
+
+The endpoint runs a constant ~7 batched `GROUP BY` aggregates regardless of event count, leveraging the existing `event_id` indexes. Create / update endpoints (`POST`, `PATCH`) keep the basic shape \u2014 the new fields are optional and use sensible defaults so the schema is backward-compatible. Implementation lives in [backend/cratekeeper_api/services/event_aggregation.py](../backend/cratekeeper_api/services/event_aggregation.py).
 
 ## 4. Storage Layout
 

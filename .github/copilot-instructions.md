@@ -1,148 +1,199 @@
-# Copilot Instructions
+# Copilot Instructions — Cratekeeper
+
+Cratekeeper is a single-operator, local-first DJ library tool: it turns a Spotify
+wishlist into a classified, mood-analyzed, properly tagged, event-ready folder
+on disk and accumulates the keepers into a curated Master Library.
+
+Read [project/PRD.md](../project/PRD.md) for product context,
+[project/ARCHITECTURE.md](../project/ARCHITECTURE.md) for the system design, and
+[project/DESIGN.md](../project/DESIGN.md) for UX/UI conventions.
+
+## Repository Layout
+
+Two services in one repo, each with its own dependency manager:
+
+- **`backend/`** — FastAPI app (`cratekeeper_api/`) wrapping a Python domain engine
+  (`cratekeeper/`). `uv` + `pyproject.toml`. Alembic migrations under
+  `backend/alembic/`. Pytest tests under `backend/tests/`. The LLM tagging code
+  is integrated here under `cratekeeper_api/integrations/anthropic_client.py` —
+  there is **no separate agent service**.
+- **`frontend/`** — React 19 + Vite 8 + TypeScript 6 + Tailwind 4 SPA.
+  `npm` + `package.json`. Routed by `react-router-dom` v7. Icons via
+  `lucide-react`.
+
+Supporting folders:
+
+- `data/` — credential JSONs (`spotify-config.json`, `tidal-session.json`) and
+  event artifacts. Mounted into the API container.
+- `docker-compose.yml` — Postgres 16 (port 5432, db `djlib`, user/pw `dj`/`dj`)
+  and the API container (port `8765`).
+- `frontend-plan/` — design system + section-by-section UI specs that informed
+  the current frontend implementation.
+- `project/` — PRD, architecture, design docs.
+- `.github/agents/` — agent-mode personas (architecture, backend, frontend,
+  qa, requirements). `.github/skills/` — invokable skills.
+
+Service-specific conventions live in
+[.github/instructions/backend.instructions.md](instructions/backend.instructions.md)
+and
+[.github/instructions/frontend.instructions.md](instructions/frontend.instructions.md).
 
 ## Build & Run
 
-```bash
-make setup          # first time: .env, Python + Node deps, Authentik provisioning
-make dev            # PostgreSQL + Authentik → migrations → backend (8000) + frontend (5173)
-make dev-stop       # stop containers
-```
+There is **no Makefile** in the repo. Use the underlying commands directly.
 
-### Testing
+### First-time setup
 
 ```bash
-make test-backend                          # all backend tests (pytest)
-cd backend && uv run pytest tests/test_api/test_rides.py  # single test file
-cd backend && uv run pytest -k test_name   # single test by name
+# Backend
+cd backend && uv sync --extra test
 
-make test-agent                            # all agent tests (pytest)
-cd agent && uv run pytest tests/test_file.py  # single agent test file
-
-make test-frontend                         # Playwright E2E (all)
-cd frontend && npx playwright test e2e/auth.spec.ts  # single E2E spec
+# Frontend
+cd frontend && npm install
 ```
 
-### Build
+### Postgres + migrations
 
 ```bash
-cd frontend && npm run build    # tsc -b + vite build
+docker compose up -d db                                 # Postgres on :5432
+cd backend && uv run alembic upgrade head               # apply migrations
 ```
 
-No linter is configured for either frontend or backend.
+### Run dev servers
 
-## Architecture
+```bash
+# API on :8765 (host/port from CRATEKEEPER_BIND_HOST/PORT, default 0.0.0.0:8765)
+cd backend && uv run cratekeeper-api
+# or:  cd backend && uv run python -m cratekeeper_api
 
-Three independent services in one repo, each with its own dependency management:
+# Frontend on :5173
+cd frontend && npm run dev
+```
 
-- **`frontend/`** — React 19 SPA. `npm` + `package.json`. Vite dev server proxied to backend.
-- **`backend/`** — FastAPI REST API. `uv` + `pyproject.toml`. Alembic for DB migrations.
-- **`agent/`** — LLM-powered product scraper (OpenAI + Anthropic). `uv` + `pyproject.toml`. Standalone CLI.
+### Required environment
 
-Service-specific conventions and patterns are in `.github/instructions/`:
-- `backend.instructions.md` — route/service/model patterns, migrations, auth
-- `frontend.instructions.md` — React patterns, Tailwind, i18n, API client
-- `agent.instructions.md` — LLM extraction, shop config, publisher architecture
-- `security.instructions.md` — JWT, rate limiting, secrets, input validation
+- `CRATEKEEPER_DB_URL` — e.g. `postgresql+psycopg://dj:dj@localhost:5432/djlib`
+- `CRATEKEEPER_FERNET_KEY` — used by `secrets_store.py` to encrypt
+  per-integration credentials. Generate with
+  `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+- `CRATEKEEPER_API_TOKEN` — bearer token required on every router (skipped only
+  when `test_mode` is on). Frontend sends it as `Authorization: Bearer …`.
+- `CRATEKEEPER_CORS_ORIGINS` — comma-separated allowed origins for CORS.
+- `ANTHROPIC_API_KEY` — for LLM tag classification. Stored either via env or
+  through the Settings page (encrypted via `secrets_store`).
+
+The full API container env is in `docker-compose.yml`.
+
+## Testing
+
+```bash
+# Backend — pytest, asyncio_mode = "auto"; spins up an ephemeral Postgres via
+# `docker run` (see backend/tests/conftest.py). Docker must be running.
+cd backend && uv run pytest
+cd backend && uv run pytest tests/test_events.py
+cd backend && uv run pytest -k test_name
+
+# Frontend — no test runner configured. Lint only:
+cd frontend && npm run lint
+cd frontend && npm run build       # tsc -b + vite build (use this to typecheck)
+```
+
+There is no Playwright / Jest / Vitest setup in `frontend/`. If a change calls
+for tests, add the smallest viable harness instead of inventing scripts.
 
 ## Conventions
 
-- **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) — `feat(BIKE-X):`, `fix(BIKE-X):`, etc. Use the feature ID when working on a tracked feature.
-- **TypeScript:** Strict mode with `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`.
-- **Python tests:** `asyncio_mode = "auto"` in pytest config — test functions can be `async def` without decorators.
-- **Backend migrations:** Alembic in `backend/alembic/`. Run `cd backend && uv run alembic revision --autogenerate -m "description"` to create new migrations.
+- **Commits:** [Conventional Commits](https://www.conventionalcommits.org/).
+  When working on a tracked feature, prefix with the feature ID
+  (`feat(CRATE-X): …`). When there is no tracked feature, use plain scopes
+  (`feat(api): …`, `fix(frontend): …`, `chore(infra): …`).
+- **TypeScript:** strict mode with `noUnusedLocals`, `noUnusedParameters`,
+  `noFallthroughCasesInSwitch`. Run `npm run build` to typecheck.
+- **Python tests:** `asyncio_mode = "auto"` — `async def` test functions need no
+  decorator. Tests use a real Postgres via `docker run`, not testcontainers.
+- **Migrations:** Alembic in `backend/alembic/`. Create with
+  `cd backend && uv run alembic revision --autogenerate -m "description"`,
+  then review the generated file before committing. The pre-existing `tracks`
+  table is owned by `cratekeeper/local_scanner.py` and mapped read-only as
+  `LibraryTrack` — Alembic must **not** create or alter it (see
+  `__table_args__ = {"info": {"skip_autogenerate": True}}` on the model).
 
-## Feature Tracking
+## Product & Architecture Quick Reference
 
-All features are tracked in `project/features/INDEX.md` with specs in `project/features/BIKE-X-name.md`. Read `project/features/README.md` for the full workflow.
+- **Pipeline (11 steps):** Fetch → Enrich → Classify → Review → Scan → Match →
+  Analyze → Classify Tags → Apply → Build Event → Build Library. Each step is
+  a job handler under `backend/cratekeeper_api/jobs/handlers/`.
+- **Job engine:** in-process asyncio queue with semaphores (1 heavy slot, 4
+  light), persistent state in Postgres, live progress over SSE
+  (`/jobs/{id}/stream`). See `backend/cratekeeper_api/jobs/engine.py`.
+- **Domain engine:** `backend/cratekeeper/` (vendored package shipped inside
+  the backend wheel via `[tool.hatch.build.targets.wheel] packages`). Pure
+  Python — imported directly by job handlers and services.
+- **Auth:** single bearer token (`CRATEKEEPER_API_TOKEN`). Routers attach
+  `AuthDep` from `routers/_auth.py`. No user accounts, no JWTs, no Authentik.
+- **Secrets:** Spotify/Tidal/Anthropic credentials encrypted at rest in the
+  `settings` table via Fernet (`cratekeeper_api/secrets_store.py`).
+- **Filesystem safety:** every path crossing the API boundary must pass through
+  `cratekeeper_api/security.py` (`get_allowed_roots`, `PathOutsideRootError`,
+  `MountNotReadyError`).
 
-**Implementation plans** live in `project/plans/BIKE-X-plan.md` — phased task checklists with manual verification checkpoints. Created by the **Solution Architect** agent, executed by **Backend Developer** and **Frontend Developer** agents.
+## Agent Workflow
 
-**Before starting any work:**
-1. Read `project/features/INDEX.md` to understand current feature landscape
-2. If the work relates to an existing feature, read its spec
-3. Check `project/plans/` for an existing implementation plan
-4. If it's a new feature not yet tracked, create a spec first (switch to the **Requirements Engineer** agent)
-
-**After completing work:**
-1. Update the feature spec with what was built and any deviations
-2. Update `project/features/INDEX.md` status if applicable (Planned → In Progress → In Review → Deployed)
-3. Update `project/plans/BIKE-X-plan.md` — check off completed tasks and update the status line
-4. Actually edit the files — don't just describe changes. Re-read after editing to verify.
-
-**Feature IDs:** Sequential `BIKE-1`, `BIKE-2`, etc. Check INDEX.md for the next available number.
-
-## Product Context
-
-See `project/PRD.md` for product vision, target users, and roadmap.
-See `project/ARCHITECTURE.md` for system architecture, API endpoints, data models, and auth flow.
-
-## Development Workflow
-
-Use specialized agents for structured feature development. Agents are selected from the **dropdown in the Copilot Chat window** (not slash commands — those are for skills). Each agent has a distinct persona with appropriate tool restrictions and handoff buttons:
+Specialized agent personas live in `.github/agents/` and are selected from the
+**Copilot Chat dropdown**. The intended flow:
 
 ```
-Requirements Engineer → Solution Architect → Backend Developer ⟷ Frontend Developer → QA Engineer
+Requirements Engineer → Solution Architect → Backend Developer ⇄ Frontend Developer → QA Engineer
 ```
 
-| Agent | Purpose |
-|-------|---------|
-| **Requirements Engineer** | Create feature specs with user stories and acceptance criteria |
-| **Solution Architect** | Design tech architecture + create implementation plan (`project/plans/BIKE-X-plan.md`) |
-| **Frontend Developer** | Build UI components, pages, styling (React, Tailwind, TypeScript) |
-| **Backend Developer** | Build APIs, database schemas, services, migrations (FastAPI, SQLModel, async Python). Also handles agent service work. |
-| **QA Engineer** | Test against acceptance criteria + security audit. Never fixes bugs — only documents them. |
+These agents reference a feature-tracking layout (`project/features/INDEX.md`,
+`project/plans/CRATE-X-plan.md`) that is **not yet present in this repo**.
+Create those files only when adopting the workflow; otherwise stick to direct
+edits and reference work via commit scopes.
 
-Supporting skills (invoked via `/skill` slash commands):
+Skills (invoked with `/skill`):
 
-| Skill | Purpose |
-|-------|---------|
-| `/release` | Tag, deploy, update changelog (shipping is always separate) |
-| `/help` | Check project status, plan progress, and get next-step guidance |
-
-Each agent reads `project/features/INDEX.md` at start and suggests the next agent on completion via handoff buttons. Handoffs are user-initiated — an agent never auto-proceeds to the next phase.
+- `/help` — orientation and next-step guidance.
+- `/frontend-design` — production-grade UI patterns.
 
 ## Agent Behavior
 
 ### Workflow
 
-For non-trivial changes, follow this sequence:
-1. **Research** — read relevant files, search for existing patterns and reusable utilities before writing code.
-2. **Plan** — decompose into small, self-contained tasks with clear acceptance criteria.
-3. **Implement** — execute each task with surgical precision. Make minimal changes.
-4. **Verify** — confirm the change works (build, tests, manual check) before moving on.
+For non-trivial changes:
+
+1. **Research** — read relevant files, reuse existing utilities.
+2. **Plan** — small, self-contained tasks with clear acceptance criteria.
+3. **Implement** — minimal, surgical changes.
+4. **Verify** — `uv run pytest` (backend) and/or `npm run build` (frontend).
 
 ### Principles
 
-- **Minimum necessary complexity.** Apply YAGNI/KISS — don't add unrequested features or speculative abstractions. Balance leanness with genuine robustness.
-- **Verify before acting.** Never assume — read the actual code, check actual file paths, confirm actual API signatures. Base decisions on verified facts, not guesses.
-- **Clean up as you go.** When changes make code obsolete, remove it immediately. No dead code, no orphaned imports.
-- **Propagate change impact.** When modifying a function signature, type, or API contract, trace and update all upstream and downstream callers.
-- **Reuse what exists.** Search for existing utilities, components, hooks, and helpers before creating new ones. Follow established patterns in the codebase.
-- **Don't hammer.** If an approach fails twice, change strategy instead of retrying the same thing.
-- **Constructive fixes only.** Address root causes — don't disable tests, suppress errors, or remove functionality to make something pass.
-- **Keep architecture docs in sync.** After making non-trivial code changes (new endpoints, models, or auth changes), update `project/ARCHITECTURE.md`.
+- **Minimum necessary complexity.** YAGNI/KISS. No speculative abstractions.
+- **Verify before acting.** Never assume — read the code, check the file path,
+  confirm the API signature.
+- **Clean up as you go.** Remove dead code and orphaned imports immediately.
+- **Propagate change impact.** Update every caller when changing a signature
+  or contract.
+- **Reuse what exists.** Search the codebase for utilities, components, hooks,
+  and services before creating new ones.
+- **Don't hammer.** If an approach fails twice, change strategy.
+- **Constructive fixes only.** Address root causes — do not disable tests or
+  suppress errors to make something pass.
+- **Keep architecture docs in sync.** After non-trivial changes (new endpoints,
+  models, auth changes), update [project/ARCHITECTURE.md](../project/ARCHITECTURE.md).
 
 ## Parallel Sessions
 
-Multiple Copilot CLI instances can run simultaneously in separate terminals to work on different parts of the project. Guidelines:
+Multiple Copilot sessions can work in parallel — keep each one to a single
+service boundary:
 
-### Recommended Session Splits
+- **Backend session** — working dir `backend/`. Routes, services, models, jobs,
+  migrations, integrations.
+- **Frontend session** — working dir `frontend/`. Components, pages, sections,
+  styles.
+- **Cross-cutting session** — `docker-compose.yml`, project docs, CI.
 
-- **Frontend session** — UI components, pages, i18n, styles. Working directory: `frontend/`.
-- **Backend session** — API routes, services, models, migrations. Working directory: `backend/`.
-- **Agent session** — Product scraper logic. Working directory: `agent/`.
-- **Cross-cutting session** — Docker, CI/CD, docs, root-level config.
-
-### Avoiding Conflicts
-
-- Each session should focus on one service boundary. Avoid editing the same files from multiple sessions.
-- Coordinate database migrations — only one session should create Alembic revisions at a time.
-- If sessions touch shared files (e.g., `docker-compose.yml`, `.env.example`), finish one edit before starting another.
-- Run `git pull --rebase` before committing to pick up changes from other sessions.
-
-### Tips
-
-- Use `/rename` to label each session (e.g., "frontend-auth", "backend-api").
-- Use `/diff` in each session to review changes before committing.
-- Keep sessions focused — one feature or fix per session works best.
-- If a change in one service requires a matching change in another (e.g., new API endpoint + frontend integration), plan the interface first, then implement in parallel.
+Coordinate Alembic revisions (only one session creates migrations at a time)
+and shared files (`docker-compose.yml`, `.env.example`). Run
+`git pull --rebase` before committing to pick up other sessions' work.

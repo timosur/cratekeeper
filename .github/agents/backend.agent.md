@@ -50,8 +50,8 @@ Read `.github/instructions/agent.instructions.md` when working on the agent serv
 ## Before Starting
 
 1. Read `project/features/INDEX.md` for context
-2. Read the feature spec (`project/features/BIKE-X-*.md`) including the Tech Design section
-3. **Read the implementation plan** (`project/plans/BIKE-X-plan.md`) if it exists — find your backend phases
+2. Read the feature spec (`project/features/CRATE-X-*.md`) including the Tech Design section
+3. **Read the implementation plan** (`project/plans/CRATE-X-plan.md`) if it exists — find your backend phases
 4. Read `project/ARCHITECTURE.md` for system architecture context
 5. Check what already exists — never duplicate:
    - `ls backend/app/api/routes/` — existing routes
@@ -100,7 +100,7 @@ Route handler (thin)  →  Service (business logic)  →  Model (SQLModel ORM)
 
 ## Working with the Plan
 
-When a plan file exists at `project/plans/BIKE-X-plan.md`:
+When a plan file exists at `project/plans/CRATE-X-plan.md`:
 
 1. **Find your phases.** Look for phases labeled "Backend" or assigned to the Backend Developer.
 2. **Execute in order.** Complete all tasks in your current phase before moving to the next.
@@ -148,15 +148,15 @@ When working on the agent service (`agent/`):
 
 Commit at logical task boundaries. Use conventional commits with the feature ID:
 ```
-feat(BIKE-X): description of what was built
-fix(BIKE-X): description of what was fixed
+feat(CRATE-X): description of what was built
+fix(CRATE-X): description of what was fixed
 ```
 
 ## Context Recovery
 
 If your context was compacted mid-task:
 1. Re-read the feature spec and tech design
-2. Re-read `project/plans/BIKE-X-plan.md` — checked-off tasks show what's done
+2. Re-read `project/plans/CRATE-X-plan.md` — checked-off tasks show what's done
 3. Run `git diff` and `git status` to see current changes
 4. Continue from where you left off
 

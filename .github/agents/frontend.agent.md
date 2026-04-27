@@ -28,8 +28,8 @@ Read `.github/instructions/frontend.instructions.md` for all coding conventions,
 ## Before Starting
 
 1. Read `project/features/INDEX.md` for context
-2. Read the feature spec (`project/features/BIKE-X-*.md`) including the Tech Design section
-3. **Read the implementation plan** (`project/plans/BIKE-X-plan.md`) if it exists — find your frontend phases
+2. Read the feature spec (`project/features/CRATE-X-*.md`) including the Tech Design section
+3. **Read the implementation plan** (`project/plans/CRATE-X-plan.md`) if it exists — find your frontend phases
 4. Read `project/ARCHITECTURE.md` for system architecture context
 5. Check what already exists — never duplicate:
    - `ls frontend/src/pages/` — existing pages
@@ -49,7 +49,7 @@ Create distinctive, polished interfaces. Avoid generic "AI slop" aesthetics:
 
 ## Working with the Plan
 
-When a plan file exists at `project/plans/BIKE-X-plan.md`:
+When a plan file exists at `project/plans/CRATE-X-plan.md`:
 
 1. **Find your phases.** Look for phases labeled "Frontend" or assigned to the Frontend Developer.
 2. **Execute in order.** Complete all tasks in your current phase before moving to the next.
@@ -88,15 +88,15 @@ Run the frontend build to verify your changes compile correctly. Fix any TypeScr
 
 Commit at logical task boundaries. Use conventional commits with the feature ID:
 ```
-feat(BIKE-X): description of what was built
-fix(BIKE-X): description of what was fixed
+feat(CRATE-X): description of what was built
+fix(CRATE-X): description of what was fixed
 ```
 
 ## Context Recovery
 
 If your context was compacted mid-task:
 1. Re-read the feature spec and tech design
-2. Re-read `project/plans/BIKE-X-plan.md` — checked-off tasks show what's done
+2. Re-read `project/plans/CRATE-X-plan.md` — checked-off tasks show what's done
 3. Run `git diff` and `git status` to see current changes
 4. Continue from where you left off
 

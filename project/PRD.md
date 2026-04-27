@@ -34,3 +34,21 @@ It runs entirely against a local music NAS, with explicit checkpoints, undo for 
 - **Build** — a materialized folder output (per-event folder or the Master Library).
 - **AuditEntry** — append-only record of any state-changing action.
 - **Setting** — stored configuration value (credentials, paths, bearer token, bucket order, model + caching toggle).
+
+## Active Feature Roadmap
+
+Tracked feature specs live in [features/INDEX.md](features/INDEX.md).
+The current focus is coupling the **Events Dashboard** to the backend
+(replacing the mock data the frontend currently ships with):
+
+| ID      | Title                                  | Priority | Services           | Status  |
+| ------- | -------------------------------------- | -------- | ------------------ | ------- |
+| CRATE-1 | Events list aggregation API            | P0       | backend            | Planned |
+| CRATE-2 | Events Dashboard wired to real API     | P0       | frontend           | Planned |
+| CRATE-3 | New Event creation flow                | P0       | frontend, backend  | Planned |
+| CRATE-4 | Resume failed job from a card          | P1       | frontend           | Planned |
+| CRATE-5 | Live updates on the Events Dashboard   | P1       | frontend, backend  | Planned |
+
+Recommended build order: **CRATE-1 → CRATE-2 → CRATE-3 → CRATE-4 → CRATE-5**.
+CRATE-2 unblocks CRATE-3 / CRATE-4 / CRATE-5; CRATE-5 should land after the
+static dashboard works end-to-end.

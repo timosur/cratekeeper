@@ -10,19 +10,19 @@ I need you to implement the **`SECTION_NAME`** section of Cratekeeper based on d
 
 Please carefully read and analyze the following files:
 
-1. **@product-plan/product-overview.md** — Product summary so you understand the broader context
-2. **@product-plan/instructions/incremental/NN-SECTION_ID.md** — Implementation instructions for this specific section
-3. **@product-plan/sections/SECTION_ID/README.md** — Section overview, user flows, and design decisions
-4. **@product-plan/sections/SECTION_ID/types.ts** — TypeScript interfaces describing the data the components expect
-5. **@product-plan/sections/SECTION_ID/components/** — The React components to integrate
-6. **@product-plan/sections/SECTION_ID/sample-data.json** — Sample data for testing before real APIs are built
-7. **@product-plan/sections/SECTION_ID/tests.md** — UI behavior test specs
+1. **@frontend-plan/product-overview.md** — Product summary so you understand the broader context
+2. **@frontend-plan/instructions/incremental/NN-SECTION_ID.md** — Implementation instructions for this specific section
+3. **@frontend-plan/sections/SECTION_ID/README.md** — Section overview, user flows, and design decisions
+4. **@frontend-plan/sections/SECTION_ID/types.ts** — TypeScript interfaces describing the data the components expect
+5. **@frontend-plan/sections/SECTION_ID/components/** — The React components to integrate
+6. **@frontend-plan/sections/SECTION_ID/sample-data.json** — Sample data for testing before real APIs are built
+7. **@frontend-plan/sections/SECTION_ID/tests.md** — UI behavior test specs
 
 Additional context (review as needed):
 
-- **@product-plan/design-system.md** — Brand voice, personality, and UI style preferences
-- **@product-plan/design-system/** — Color and typography tokens
-- **@product-plan/data-shapes/** — UI data contracts shared across sections
+- **@frontend-plan/design-system.md** — Brand voice, personality, and UI style preferences
+- **@frontend-plan/design-system/** — Color and typography tokens
+- **@frontend-plan/data-shapes/** — UI data contracts shared across sections
 
 ## Before You Begin
 

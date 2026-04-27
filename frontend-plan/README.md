@@ -5,7 +5,7 @@ This package contains everything needed to implement the Cratekeeper UI: finishe
 ## What's included
 
 ```
-product-plan/
+frontend-plan/
 ├── README.md                       ← this file
 ├── product-overview.md             ← product summary, sections, entities
 ├── design-system.md                ← brand voice, personality, UI style
@@ -49,7 +49,7 @@ product-plan/
 
 Implement one milestone at a time. Best when you want to ship a usable shell quickly, then layer features.
 
-1. Copy this `product-plan/` folder into your implementation codebase.
+1. Copy this `frontend-plan/` folder into your implementation codebase.
 2. Open [prompts/section-prompt.md](prompts/section-prompt.md), replace the `SECTION_NAME`, `SECTION_ID`, and `NN` placeholders for the milestone you're working on, and add any notes in the Notes section.
 3. Paste the prompt into your coding agent (Claude Code, Cursor, Copilot, …).
 4. Answer the agent's clarifying questions (tech stack, what's already in place, backend wiring).
@@ -66,7 +66,7 @@ Implement one milestone at a time. Best when you want to ship a usable shell qui
 
 Implement everything in a single session. Best for a greenfield prototype with a strong agent and clear requirements.
 
-1. Copy this `product-plan/` folder into your implementation codebase.
+1. Copy this `frontend-plan/` folder into your implementation codebase.
 2. Open [prompts/one-shot-prompt.md](prompts/one-shot-prompt.md), add any notes in the Notes section.
 3. Paste the prompt into your coding agent.
 4. Answer its clarifying questions.

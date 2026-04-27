@@ -16,7 +16,7 @@ services:
       retries: 10
 
   api:
-    build: ./cratekeeper-api
+    build: ./backend
     depends_on:
       db:
         condition: service_healthy
@@ -32,13 +32,6 @@ services:
       - CRATEKEEPER_FERNET_KEY=${CRATEKEEPER_FERNET_KEY:-}
       - CRATEKEEPER_API_TOKEN=${CRATEKEEPER_API_TOKEN:-}
       - CRATEKEEPER_CORS_ORIGINS=http://localhost,http://localhost:5173
-
-  web:
-    build: ./cratekeeper-web
-    depends_on:
-      - api
-    ports:
-      - "8080:80"
 
 volumes:
   pgdata:

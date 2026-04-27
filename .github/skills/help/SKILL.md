@@ -21,7 +21,7 @@ Read these files to understand the current state:
 
 ### 2. Read Active Plans
 
-List files in `project/plans/`. For any `BIKE-X-plan.md` file:
+List files in `project/plans/`. For any `CRATE-X-plan.md` file:
 - Read the `> Status:` line to determine plan state
 - Count checked `[x]` vs unchecked `[ ]` tasks to determine progress
 - Note which phase is currently active
@@ -55,8 +55,8 @@ Output format:
 
 | ID | Feature | Status | Next Action |
 |----|---------|--------|-------------|
-| BIKE-1 | Name | Deployed | — |
-| BIKE-16 | Name | Planned | Switch to **Solution Architect** agent |
+| CRATE-1 | Name | Deployed | — |
+| CRATE-16 | Name | Planned | Switch to **Solution Architect** agent |
 
 ### Active Implementation Plans
 
@@ -64,10 +64,10 @@ For each active plan (status is not "Complete" or "Not Started"):
 
 | Feature | Plan Status | Progress | Current Phase | Next Task |
 |---------|-------------|----------|---------------|-----------|
-| BIKE-18 | In Progress (Phase 2) | 7/12 tasks | Phase 2: Core Components | Migrate Dialog component |
+| CRATE-18 | In Progress (Phase 2) | 7/12 tasks | Phase 2: Core Components | Migrate Dialog component |
 
 If a checkpoint is pending user verification, highlight it:
-> ⏸ **BIKE-18** is waiting for manual verification at the end of Phase 1. Review and confirm to proceed.
+> ⏸ **CRATE-18** is waiting for manual verification at the end of Phase 1. Review and confirm to proceed.
 
 ### Recommended Next Step
 
@@ -89,4 +89,4 @@ If a checkpoint is pending user verification, highlight it:
 
 - If multiple features are in different states, recommend the one closest to completion
 - If no features need work, suggest reviewing `project/PRD.md` for the next priority
-- Always mention the specific feature ID (BIKE-X) in recommendations
+- Always mention the specific feature ID (CRATE-X) in recommendations

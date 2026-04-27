@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Cratekeeper Design Tokens
+ * ---------------------------
+ * Custom properties for surfaces, density and dark-mode variables.
+ * Tailwind v4 utilities (sky-*, emerald-*, neutral-*) drive the rest.
+ */
+
+:root {
+  --font-heading: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body:    "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-md:   0.375rem;
+  --radius-full: 9999px;
+
+  --row-height-nav:   36px;
+  --row-height-table: 32px;
+  --topbar-height:    56px;
+}
+
+.dark {
+  --color-surface-base:    oklch(0.145 0 0);
+  --color-surface-raised:  oklch(0.18 0 0);
+  --color-surface-overlay: oklch(0.22 0 0);
+  --color-text-primary:    oklch(0.970 0 0);
+  --color-text-secondary:  oklch(0.553 0 0);
+  --color-border-subtle:   oklch(0.27 0 0);
+}
+
+:root:not(.dark) {
+  --color-surface-base:    #ffffff;
+  --color-surface-raised:  oklch(0.985 0 0);
+  --color-surface-overlay: #ffffff;
+  --color-text-primary:    oklch(0.205 0 0);
+  --color-text-secondary:  oklch(0.553 0 0);
+  --color-border-subtle:   oklch(0.922 0 0);
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    font-family: var(--font-body);
+  }
+
+  code,
+  kbd,
+  pre,
+  samp,
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  #root {
+    height: 100%;
+  }
+}

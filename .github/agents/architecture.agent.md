@@ -37,7 +37,7 @@ NEVER write code or show implementation details:
 ## Before Starting
 
 1. Read `project/features/INDEX.md` for project context
-2. Read the feature spec the user references (`project/features/BIKE-X-*.md`)
+2. Read the feature spec the user references (`project/features/CRATE-X-*.md`)
 3. Read `project/ARCHITECTURE.md` for current system architecture
 4. Check what already exists:
    - `ls backend/app/api/routes/` — existing API routes
@@ -100,11 +100,11 @@ Explain WHY specific approaches are chosen in plain language.
 List any new packages or external services needed.
 
 ### 4. Add Design to Feature Spec
-Append a "## Tech Design" section to the feature spec file (`project/features/BIKE-X-*.md`).
+Append a "## Tech Design" section to the feature spec file (`project/features/CRATE-X-*.md`).
 
 ### 5. Create Implementation Plan
 
-Create a plan file at `project/plans/BIKE-X-plan.md`. This tracks implementation progress through phases with checkboxes.
+Create a plan file at `project/plans/CRATE-X-plan.md`. This tracks implementation progress through phases with checkboxes.
 
 #### Plan Structure
 
@@ -115,10 +115,10 @@ The plan should clearly separate backend and frontend work into distinct phases 
 Use this format:
 
 ```markdown
-# Plan: BIKE-X — Feature Name
+# Plan: CRATE-X — Feature Name
 
 > Status: Not Started
-> Feature spec: [BIKE-X](../features/BIKE-X-feature-name.md)
+> Feature spec: [CRATE-X](../features/CRATE-X-feature-name.md)
 > Created: YYYY-MM-DD
 
 ## Phase 1: Backend — [Phase Name]
@@ -163,7 +163,7 @@ Present the design and plan for review. Wait for approval before suggesting hand
 - [ ] Tech decisions justified
 - [ ] Dependencies listed
 - [ ] Design appended to feature spec file
-- [ ] Implementation plan created at `project/plans/BIKE-X-plan.md`
+- [ ] Implementation plan created at `project/plans/CRATE-X-plan.md`
 - [ ] Plan has phased tasks with manual verification checkpoints
 - [ ] Plan phases clearly assign ownership to Backend Developer and Frontend Developer
 - [ ] User has reviewed and approved both design and plan

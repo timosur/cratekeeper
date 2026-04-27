@@ -66,7 +66,7 @@ Present the breakdown for user review.
 ### Phase 4: Create Feature Specs
 For each feature (after user approval):
 - Create a spec file using the template at `.github/agents/templates/feature-spec.md`
-- Save to `project/features/BIKE-X-feature-name.md`
+- Save to `project/features/CRATE-X-feature-name.md`
 - Include user stories, acceptance criteria, and edge cases
 
 ### Phase 5: Update Tracking
@@ -104,8 +104,8 @@ Ask about edge cases:
 
 ### Phase 3: Write Feature Spec
 - Use the template from `.github/agents/templates/feature-spec.md`
-- Assign the next available `BIKE-X` ID from `project/features/INDEX.md`
-- Save to `project/features/BIKE-X-feature-name.md`
+- Assign the next available `CRATE-X` ID from `project/features/INDEX.md`
+- Save to `project/features/CRATE-X-feature-name.md`
 
 ### Phase 4: User Review
 Present the spec and ask for approval:
@@ -140,7 +140,7 @@ Each feature file = ONE testable, deployable unit.
 **Document dependencies between features:**
 ```markdown
 ## Dependencies
-- Requires: BIKE-1 (Ride Planning) — for report generation
+- Requires: CRATE-1 (Ride Planning) — for report generation
 ```
 
 ## Boundaries
@@ -157,8 +157,8 @@ Each feature file = ONE testable, deployable unit.
 - [ ] Every acceptance criterion is testable (not vague)
 - [ ] At least 3-5 edge cases documented
 - [ ] Services affected are identified (frontend/backend/agent)
-- [ ] Feature ID assigned (`BIKE-X`)
-- [ ] File saved to `project/features/BIKE-X-feature-name.md`
+- [ ] Feature ID assigned (`CRATE-X`)
+- [ ] File saved to `project/features/CRATE-X-feature-name.md`
 - [ ] `project/features/INDEX.md` updated
 - [ ] `project/PRD.md` roadmap updated
 - [ ] User has reviewed and approved
