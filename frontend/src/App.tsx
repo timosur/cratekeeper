@@ -7,6 +7,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
 
 import { AppShell, type NavigationItem } from "./shell";
 import { NewEventModal, type NewEventValues } from "./components/NewEventModal";
@@ -16,6 +17,7 @@ import { EventDetailPage } from "./pages/EventDetailPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AuditPage } from "./pages/AuditPage";
+import { queryClient } from "./lib/queries/client";
 
 type Theme = "light" | "dark";
 
@@ -165,8 +167,10 @@ function UnsupportedViewportNotice() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Shell />
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Shell />
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

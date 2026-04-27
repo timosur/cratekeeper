@@ -1,73 +1,64 @@
-# React + TypeScript + Vite
+# Cratekeeper Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Single-page React app for the Cratekeeper operator. Wired to the FastAPI
+backend at `backend/` over a bearer-protected REST API.
 
-Currently, two official plugins are available:
+## Tech
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19 + TypeScript 6 + Vite 8
+- Tailwind CSS 4
+- React Router v7
+- TanStack Query v5 (cache + refetch-on-focus)
+- `lucide-react` icons
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd frontend
+npm install
+cp .env.example .env.local      # then edit VITE_API_TOKEN
+npm run dev                     # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Environment variables
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Read at build time by Vite. Define them in `.env.local` (gitignored).
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Variable             | Default                  | Purpose                                                                            |
+| -------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
+| `VITE_API_BASE_URL`  | `http://localhost:8765`  | Base URL of the Cratekeeper API. No trailing slash.                                |
+| `VITE_API_TOKEN`     | _(empty)_                | Bearer token. Must match the backend's `CRATEKEEPER_API_TOKEN`. Required for auth. |
+
+The `apiFetch` client in [src/lib/api/client.ts](src/lib/api/client.ts)
+injects `Authorization: Bearer <token>` on every request.
+
+## Project layout
+
 ```
+src/
+├── App.tsx                # routes + QueryClientProvider
+├── main.tsx
+├── components/            # shared cross-page components (modals, contexts)
+├── lib/
+│   ├── api/               # typed HTTP client + response types + mappers
+│   └── queries/           # TanStack Query hooks and the shared QueryClient
+├── pages/                 # one component per top-level route
+├── sections/              # design-system sections (Dashboard, EventDetail, …)
+└── shell/                 # AppShell (sidebar + topbar) chrome
+```
+
+API plumbing always flows: `pages/` → `lib/queries/*` → `lib/api/*`. UI
+components stay decoupled from the network layer — pages map backend
+payloads to the existing UI props before passing them down.
+
+## Scripts
+
+```bash
+npm run dev       # Vite dev server
+npm run build     # tsc -b && vite build (use this to typecheck)
+npm run lint      # ESLint
+npm run preview   # preview the production build
+```
+
+There is no test runner configured yet; the `build` step is the
+typecheck gate.
